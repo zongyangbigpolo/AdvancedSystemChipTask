@@ -2,7 +2,7 @@
 
 ## 1. 范围与实验约定
 
-本阶段包含五天任务，依次覆盖同机网络、虚拟机网络、性能对照、跨节点 VXLAN、OVS-DPDK。每一天为独立子阶段，任务清单中的方框仅在操作记录与原始数据齐备后勾选。
+本阶段包含五个子阶段，依次覆盖同机网络、虚拟机网络、性能对照、跨节点 VXLAN、OVS-DPDK。各子阶段独立编号，任务清单中的方框仅在操作记录与原始数据齐备后勾选。
 
 ConnectX-5（CX5）是具备嵌入式交换与流表卸载能力的网卡，不等同于带独立 Arm 处理器的 BlueField DPU。本阶段以 CX5 学习 DPU 数据面所涉及的技术，不包含在 DPU Arm 操作系统上部署服务。若改用 BlueField，须另行记录 NIC/DPU 模式、主机与 Arm 侧的设备归属，不能直接照搬 PCI 地址及端口拓扑。
 
@@ -64,19 +64,19 @@ mkdir -p "$LAB"/{src,images,results}
 
 “配置了 `hw-offload=true`”不等于“流已经卸载”；必须同时具有流表卸载标记、命中计数增长及端口计数等证据。性能差异可以为零或负值，不能预设硬件卸载一定提高吞吐。
 
-## 2. Phase 1.1 / 第一天：SR-IOV、OVS 与 namespace
+## 2. Phase 1.1：SR-IOV、OVS 与 namespace
 
 ### 2.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | D1-01 SR-IOV 场景与网卡调研 | 区分 PF、VF、representor 和适用场景 | 查型号手册、PCI ID、驱动及特性矩阵 | CX5；其他系列作资料对照 | 按具体 SKU 和驱动核对，避免将系列名称等同于功能保证 |
-| [ ] | D1-02 CX5 启用 SR-IOV | 创建可分配的 VF | BIOS、固件、sysfs、IOMMU 检查 | 支持 IOMMU 的主机与 CX5 | 同时检查平台和设备，避免仅创建 VF 而无法直通 |
-| [ ] | D1-03 源码安装并启动 OVS | 建立可追溯的软件交换基线 | 固定源码版本、编译、初始化 OVSDB、启动守护进程 | 单节点服务器 | 独立安装前缀，避免与发行版 OVS 混用 |
-| [ ] | D1-04 VF 分配 namespace 并接入 OVS | 建立受 OVS 控制的 VF 数据路径 | switchdev、VF netdev 移入 namespace、representor 加桥 | 一张 CX5、两个 VF | VF 留给端点，representor 留在宿主机承担交换控制 |
-| [ ] | D1-05 两个 namespace 互通 | 检查地址、ARP、双向转发 | 静态 IPv4、双向 ping、流表及计数检查 | 同上 | 先完成最小二层闭环，再引入虚拟机和隧道 |
+| [ ] | DPU-P1.1-01 SR-IOV 场景与网卡调研 | 区分 PF、VF、representor 和适用场景 | 查型号手册、PCI ID、驱动及特性矩阵 | CX5；其他系列作资料对照 | 按具体 SKU 和驱动核对，避免将系列名称等同于功能保证 |
+| [ ] | DPU-P1.1-02 CX5 启用 SR-IOV | 创建可分配的 VF | BIOS、固件、sysfs、IOMMU 检查 | 支持 IOMMU 的主机与 CX5 | 同时检查平台和设备，避免仅创建 VF 而无法直通 |
+| [ ] | DPU-P1.1-03 源码安装并启动 OVS | 建立可追溯的软件交换基线 | 固定源码版本、编译、初始化 OVSDB、启动守护进程 | 单节点服务器 | 独立安装前缀，避免与发行版 OVS 混用 |
+| [ ] | DPU-P1.1-04 VF 分配 namespace 并接入 OVS | 建立受 OVS 控制的 VF 数据路径 | switchdev、VF netdev 移入 namespace、representor 加桥 | 一张 CX5、两个 VF | VF 留给端点，representor 留在宿主机承担交换控制 |
+| [ ] | DPU-P1.1-05 两个 namespace 互通 | 检查地址、ARP、双向转发 | 静态 IPv4、双向 ping、流表及计数检查 | 同上 | 先完成最小二层闭环，再引入虚拟机和隧道 |
 
-### 2.2 D1-01：原理与支持系列
+### 2.2 DPU-P1.1-01：原理与支持系列
 
 SR-IOV 将同一 PCIe 设备暴露为一个或多个 PF 及多个 VF。PF 负责资源管理，VF 提供可独立分配的 PCIe 功能。适用场景包括云虚拟机高吞吐网络、NFV、容器专用 VF 和低延迟网络；限制包括设备资源配额、迁移约束、硬件依赖及可观测性变化。
 
@@ -98,7 +98,7 @@ ip -d link show "$PF"
 
 `sriov_totalvfs` 不存在时，应核对型号、驱动和固件，而不是直接写入 `sriov_numvfs`。VF 最大值还受 BIOS、固件和资源分配影响。
 
-### 2.3 D1-02：启用 SR-IOV
+### 2.3 DPU-P1.1-02：启用 SR-IOV
 
 1. BIOS/UEFI 开启 CPU 虚拟化、IOMMU、SR-IOV；需要时开启 Above 4G Decoding。保存原设置。
 2. 通过发行版启动加载器启用 IOMMU：Intel 常用 `intel_iommu=on iommu=pt`，AMD 按平台使用 `amd_iommu=on iommu=pt`。更新启动配置并在维护窗口重启。
@@ -126,7 +126,7 @@ readlink -f "/sys/class/net/$PF/device/virtfn1"
 
 根据 `virtfn0/1` 真实路径重新设置 `VF0_BDF`、`VF1_BDF`，并通过 `/sys/bus/pci/devices/<BDF>/net/` 查 VF netdev。不能假定 VF PCI 地址连续。
 
-### 2.4 D1-03：源码安装并启动 OVS
+### 2.4 DPU-P1.1-03：源码安装并启动 OVS
 
 以下使用独立前缀。已有 OVS 服务时，先确认没有其他业务依赖，再停止该实例；不允许两个 `ovs-vswitchd` 同时管理实验端口。后续涉及 `sudo ovs-*` 的命令须先确认 sudo 使用相同前缀的工具；可将命令名直接替换为 `$OVS_PREFIX/bin/ovs-vsctl`、`$OVS_PREFIX/bin/ovs-ofctl` 或 `$OVS_PREFIX/bin/ovs-appctl`，避免 sudo 的 secure_path 选中发行版旧版本。
 
@@ -170,7 +170,7 @@ sudo ovs-appctl -t ovs-vswitchd version
 
 若命令通过 `sudo` 执行时 PATH 不包含安装前缀，使用完整路径。检查 OVSDB socket、两个进程和日志；启动失败时保留错误，不继续创建端口。
 
-### 2.5 D1-04：switchdev、representor 与 namespace
+### 2.5 DPU-P1.1-04：switchdev、representor 与 namespace
 
 切换模式前停止所有 VF 使用者，并确认 VF 当前绑定 `mlx5_core`。部分驱动要求先解绑 VF：
 
@@ -211,7 +211,7 @@ sudo ovs-vsctl add-port br-sriov "$REP1" -- set Interface "$REP1" ofport_request
 sudo ovs-vsctl set Open_vSwitch . other_config:hw-offload=false
 ```
 
-`hw-offload` 的变更按版本要求重启 `ovs-vswitchd` 后生效，重启方法见第三天。桥为本实验专用，确认实际 `ofport` 为 1、2 且 `error` 为空后安装双向规则：
+`hw-offload` 的变更按版本要求重启 `ovs-vswitchd` 后生效，重启方法见Phase 1.3。桥为本实验专用，确认实际 `ofport` 为 1、2 且 `error` 为空后安装双向规则：
 
 ```bash
 sudo ovs-vsctl --columns=name,ofport,error list Interface
@@ -221,7 +221,7 @@ sudo ovs-ofctl add-flow br-sriov 'priority=100,in_port=2,actions=output:1'
 
 这里使用显式转发而不是依赖未知学习状态。VF netdev 被移动到 namespace，representor 不移动；不能将两者都加入 OVS。同机实验无需把物理上联端口接入该桥。
 
-### 2.6 D1-05：双向连通与故障定位
+### 2.6 DPU-P1.1-05：双向连通与故障定位
 
 ```bash
 sudo ip netns exec ns-a ping -c 10 192.0.2.12
@@ -236,18 +236,18 @@ sudo ovs-appctl dpctl/dump-flows -m
 
 阶段产物：SR-IOV 支持对照、设备映射表、源码版本/构建记录、OVS 配置、双向 ping 日志。尚未执行时不填写成功结论。
 
-## 3. Phase 1.2 / 第二天：虚拟化与虚拟机镜像
+## 3. Phase 1.2：虚拟化与虚拟机镜像
 
 ### 3.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | D2-01 虚拟化方案比较 | 明确 VMM、全虚拟化与半虚拟化的边界 | 比较 VMware、Xen、QEMU-KVM、容器 | 支持虚拟化的服务器 | 同时比较隔离、设备支持、迁移和运维成本，不只比较吞吐 |
-| [ ] | D2-02 制作 netperf 基础镜像 | 固定客户机系统与发流工具 | 安装系统、编译 netperf、关机封装、创建写入层 | 宿主机磁盘及构建 VM | 共用只读基镜像，避免两台 VM 写同一 qcow2 |
-| [ ] | D2-03 TAP/virtio 虚拟机互通 | 建立可观测的软件虚拟网络基线 | QEMU-KVM + TAP + virtio-net + OVS | 单节点、两台 VM | 先检查镜像与地址配置，避免直通问题与镜像问题混淆 |
-| [ ] | D2-04 VF 直通及虚拟机互通 | 建立第三至第五天所需 VF 网络 | IOMMU、vfio-pci、QEMU vfio-pci、representor 交换 | CX5、独立 IOMMU 组的两个 VF | 端点使用 VF，宿主机仍通过 representor 控制转发 |
+| [ ] | DPU-P1.2-01 虚拟化方案比较 | 明确 VMM、全虚拟化与半虚拟化的边界 | 比较 VMware、Xen、QEMU-KVM、容器 | 支持虚拟化的服务器 | 同时比较隔离、设备支持、迁移和运维成本，不只比较吞吐 |
+| [ ] | DPU-P1.2-02 制作 netperf 基础镜像 | 固定客户机系统与发流工具 | 安装系统、编译 netperf、关机封装、创建写入层 | 宿主机磁盘及构建 VM | 共用只读基镜像，避免两台 VM 写同一 qcow2 |
+| [ ] | DPU-P1.2-03 TAP/virtio 虚拟机互通 | 建立可观测的软件虚拟网络基线 | QEMU-KVM + TAP + virtio-net + OVS | 单节点、两台 VM | 先检查镜像与地址配置，避免直通问题与镜像问题混淆 |
+| [ ] | DPU-P1.2-04 VF 直通及虚拟机互通 | 建立Phase 1.3 至 Phase 1.5 所需 VF 网络 | IOMMU、vfio-pci、QEMU vfio-pci、representor 交换 | CX5、独立 IOMMU 组的两个 VF | 端点使用 VF，宿主机仍通过 representor 控制转发 |
 
-### 3.2 D2-01：虚拟化方式对比
+### 3.2 DPU-P1.2-01：虚拟化方式对比
 
 | 方式 | 结构与优点 | 局限 | 适用场景 |
 | --- | --- | --- | --- |
@@ -255,11 +255,11 @@ sudo ovs-appctl dpctl/dump-flows -m
 | VMware Workstation/Fusion | 宿主型桌面虚拟化，便于开发调试 | 不等同于 ESXi；宿主资源竞争，设备直通能力受平台限制 | 桌面实验，不作为本阶段 CX5 卸载基线 |
 | Xen | 裸机 Hypervisor，Dom0 管理；支持 PV、HVM、PVH | 管理域及驱动模型增加运维复杂度；兼容性需核对 | 云平台、隔离域研究 |
 | QEMU-KVM | KVM 提供内核 CPU 虚拟化，QEMU 提供设备模型，virtio 提供半虚拟化 I/O；开源且便于追踪数据路径 | 需管理镜像、网络、NUMA、IOMMU；直通仍受设备迁移限制 | Linux 网络与设备直通实验 |
-| Linux 容器/namespace | 共用宿主内核，启动快，资源开销小 | 不是完整硬件虚拟机；内核隔离边界和驱动环境不同 | 第一天的最小网络功能验证 |
+| Linux 容器/namespace | 共用宿主内核，启动快，资源开销小 | 不是完整硬件虚拟机；内核隔离边界和驱动环境不同 | Phase 1.1 的最小网络功能验证 |
 
 QEMU 可以不使用 KVM 进行软件模拟，但该模式的 CPU 开销不适合作为本实验性能基线。VF 直通不保证热迁移；必须核对具体设备与管理栈支持。
 
-### 3.3 D2-02：制作含 netperf 的镜像
+### 3.3 DPU-P1.2-02：制作含 netperf 的镜像
 
 安装 QEMU/KVM、镜像工具及 ISO 制作依赖：
 
@@ -308,7 +308,7 @@ qemu-img create -f qcow2 -F qcow2 -b "$LAB/images/base.qcow2" "$LAB/images/vm-b.
 
 基镜像生成后保持不变。交付镜像时，要么连同 backing chain、相对路径和清单一起打包，要么在 VM 关机后用 `qemu-img convert -O qcow2` 导出各自的独立镜像；不能仅复制依赖 backing file 的写入层。清单包含系统、内核、netperf commit、工具版本、散列和启动参数。
 
-### 3.4 D2-03：TAP 与 virtio 基线
+### 3.4 DPU-P1.2-03：TAP 与 virtio 基线
 
 使用独立桥，避免和 VF 路径混合：
 
@@ -336,7 +336,7 @@ qemu-system-x86_64 -name vm-a -enable-kvm -machine q35 -cpu host \
 
 VM-b 使用 `vm-b.qcow2`、`tap-b`、名称 `vm-b` 和 MAC `02:00:00:00:02:02`。客户机通过 `ip -br link` 按 MAC 找到数据接口；分别配置 `192.0.2.11/24`、`192.0.2.12/24`，开启接口后双向 ping。串口未配置时改用图形控制台，不能将无串口输出误判为 KVM 故障。
 
-### 3.5 D2-04：VF 直通
+### 3.5 DPU-P1.2-04：VF 直通
 
 先关闭 TAP 模式 VM。退出 namespace 中的所有进程，将两个 VF netdev 移回宿主机，再删除空 namespace：
 
@@ -378,18 +378,18 @@ VM-b 使用独立镜像、名称和 `VF1_BDF`。不要同时启动使用同一�
 
 阶段产物：方案比较、独立镜像及清单、TAP 和 VF 两组启动命令、IOMMU 分组记录、两种路径的互通日志。
 
-## 4. Phase 1.3 / 第三天：VF 直通性能与分段聚合卸载
+## 4. Phase 1.3：VF 直通性能与分段聚合卸载
 
 ### 4.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | D3-01 建立测试矩阵 | 统一报文、并发与测量口径 | 固定 TCP/UDP、128/256/512/1500 B、1/4/8 并发 | 单节点 CX5、两台 VF VM | 分清应用消息长度和线上帧长，避免错误比较 |
-| [ ] | D3-02 OVS 软件与硬件转发对照 | 测量 eSwitch 流表卸载影响 | 同一拓扑切换 hw-offload，收集流表和 CPU | 同上 | 拓扑、规则、CPU 和客户机卸载状态保持一致 |
-| [ ] | D3-03 TSO/LRO/GRO/GSO 对照 | 区分分段聚合与交换卸载收益 | 客户机和相关宿主接口检查 ethtool，分组启停 | 支持相应特性的 VF/驱动 | 不把分段聚合统称为完整 TOE |
-| [ ] | D3-04 专业方向分析 | 定位小包、队列、CPU 或硬件瓶颈 | 对照 pps、吞吐、丢包、CPU、NUMA 与流命中 | 同上 | 用观测结果解释路径开销，而非预设结论 |
+| [ ] | DPU-P1.3-01 建立测试矩阵 | 统一报文、并发与测量口径 | 固定 TCP/UDP、128/256/512/1500 B、1/4/8 并发 | 单节点 CX5、两台 VF VM | 分清应用消息长度和线上帧长，避免错误比较 |
+| [ ] | DPU-P1.3-02 OVS 软件与硬件转发对照 | 测量 eSwitch 流表卸载影响 | 同一拓扑切换 hw-offload，收集流表和 CPU | 同上 | 拓扑、规则、CPU 和客户机卸载状态保持一致 |
+| [ ] | DPU-P1.3-03 TSO/LRO/GRO/GSO 对照 | 区分分段聚合与交换卸载收益 | 客户机和相关宿主接口检查 ethtool，分组启停 | 支持相应特性的 VF/驱动 | 不把分段聚合统称为完整 TOE |
+| [ ] | DPU-P1.3-04 专业方向分析 | 定位小包、队列、CPU 或硬件瓶颈 | 对照 pps、吞吐、丢包、CPU、NUMA 与流命中 | 同上 | 用观测结果解释路径开销，而非预设结论 |
 
-### 4.2 D3-01：长度、并发与结果口径
+### 4.2 DPU-P1.3-01：长度、并发与结果口径
 
 | 维度 | 取值 |
 | --- | --- |
@@ -403,9 +403,9 @@ VM-b 使用独立镜像、名称和 `VF1_BDF`。不要同时启动使用同一�
 
 基础全因子矩阵为 `2 × 4 × 3 × 2 × 2 = 96` 格，每方向至少 288 次重复；单项卸载诊断与预热额外计时。顺序执行已约需数小时，须预留配置切换、失败重试和分析时间。
 
-**1500 字节的定义：**1500 B UDP payload 加 IPv4/UDP 头为 1528 B，超过 MTU 1500。若测无分片数据报，同机可将 VM、VF、representor 及相关路径 MTU 设为 1600，第四天将 underlay 至少设为 1650（示例 1700）并核对交换机支持。若硬件只能 MTU 1500，保留该测试但明确记录 IP 分片及重组，不能称为“1500 B 以太网帧”。TCP 的 `-m` 不能保证 TCP segment 或线速帧长；若要求固定线速帧长，另加 TRex/MoonGen/testpmd 等包发生器测试，不替代 netperf 数据。
+**1500 字节的定义：**1500 B UDP payload 加 IPv4/UDP 头为 1528 B，超过 MTU 1500。若测无分片数据报，同机可将 VM、VF、representor 及相关路径 MTU 设为 1600，Phase 1.4 将 underlay 至少设为 1650（示例 1700）并核对交换机支持。若硬件只能 MTU 1500，保留该测试但明确记录 IP 分片及重组，不能称为“1500 B 以太网帧”。TCP 的 `-m` 不能保证 TCP segment 或线速帧长；若要求固定线速帧长，另加 TRex/MoonGen/testpmd 等包发生器测试，不替代 netperf 数据。
 
-### 4.3 D3-02：切换 OVS 卸载与证据
+### 4.3 DPU-P1.3-02：切换 OVS 卸载与证据
 
 在无发流、允许短暂中断时切换。以下为本文件直接启动的 OVS 实例重启方式：
 
@@ -476,7 +476,7 @@ pidstat -t -p "$(pidof ovs-vswitchd)" 1 70 > ovs-cpu.log
 
 两条命令分别启动，覆盖同一发流时间窗；客户机采集 `mpstat`，不运行没有 OVS 进程的 `pidstat` 命令。发流前后保存 `ip -s link`、`ethtool -S`、`nstat`、OVS/TC 流表。记录 vCPU、QEMU、IRQ 的 CPU 亲和性与 NUMA；监控进程不要与发流进程争用同一隔离核。初次测试保持相同默认绑核，后续 NUMA/IRQ 调整单列实验。
 
-### 4.5 D3-03：分段与聚合卸载
+### 4.5 DPU-P1.3-03：分段与聚合卸载
 
 TSO/GSO 负责发送分段，LRO/GRO 负责接收聚合，和 OVS 流表卸载是两个维度。TOE 严格指 TCP Offload Engine，完整卸载 TCP 协议栈；不能把 CX5 的 TSO、LRO、GRO、GSO 测试描述为完整 TOE 测试。
 
@@ -501,7 +501,7 @@ ethtool -k eth0 > features-on.txt
 
 在固定 OVS 卸载状态下，以“可支持项全关”为起点，分别测试仅 GSO、仅 GRO、TSO+其必需依赖、LRO+其必需依赖；记录驱动自动调整的依赖项。一次只引入一个有效配置差异。
 
-### 4.6 D3-04：分析任务与报告表
+### 4.6 DPU-P1.3-04：分析任务与报告表
 
 专业方向分析聚焦三个问题：小消息是否受 CPU/pps 限制；并发是否改善队列利用或只增加争用；硬件落表后软件 CPU 降低是否转化为吞吐/丢包改善。比较时说明 PCIe、NUMA、CPU 频率和网卡速率限制。
 
@@ -511,22 +511,22 @@ ethtool -k eth0 > features-on.txt
 
 每组报告至少给出重复值、均值、标准差及异常原因。吞吐增益为 `(开启-关闭)/关闭×100%`，CPU 降幅为 `(关闭-开启)/关闭×100%`；分母为零时不计算。CPU 需说明“一核 100%”或“全机归一化”等口径。没有延迟测试就不报告延迟百分位；没有功耗计就不报告能效。
 
-## 5. Phase 1.4 / 第四天：跨节点 VXLAN 与卸载
+## 5. Phase 1.4：跨节点 VXLAN 与卸载
 
 ### 5.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | D4-01 VXLAN 场景与封装调研 | 区分 underlay 和 overlay | 分析 VTEP、VNI、UDP 4789、封装与 MTU | 两节点、可达物理网络 | 理解二层租户网络如何跨越三层网络 |
-| [ ] | D4-02 两节点 VF 虚拟机直连基线 | 排除物理网络和 VF 基础问题 | rep↔uplink，VM 配同一测试子网后打流 | 每节点 CX5、一个 VF、一个 VM | 先测无隧道路径，后续才可区分封装开销 |
-| [ ] | D4-03 VXLAN 跨节点通信 | 构造 overlay 数据路径 | 两侧 OVS 配固定 VNI、local/remote IP、静态转发 | 同上，underlay MTU 足够 | 使用最小静态拓扑，减少控制面变量 |
-| [ ] | D4-04 隧道卸载对照与报告 | 判断封装/解封装是否落硬件 | 复用第三天矩阵、流表和物理口计数 | 支持对应动作的 CX5/固件/驱动组合 | VXLAN 互通不代表 VXLAN 已卸载，必须检查封装动作和命中 |
+| [ ] | DPU-P1.4-01 VXLAN 场景与封装调研 | 区分 underlay 和 overlay | 分析 VTEP、VNI、UDP 4789、封装与 MTU | 两节点、可达物理网络 | 理解二层租户网络如何跨越三层网络 |
+| [ ] | DPU-P1.4-02 两节点 VF 虚拟机直连基线 | 排除物理网络和 VF 基础问题 | rep↔uplink，VM 配同一测试子网后打流 | 每节点 CX5、一个 VF、一个 VM | 先测无隧道路径，后续才可区分封装开销 |
+| [ ] | DPU-P1.4-03 VXLAN 跨节点通信 | 构造 overlay 数据路径 | 两侧 OVS 配固定 VNI、local/remote IP、静态转发 | 同上，underlay MTU 足够 | 使用最小静态拓扑，减少控制面变量 |
+| [ ] | DPU-P1.4-04 隧道卸载对照与报告 | 判断封装/解封装是否落硬件 | 复用Phase 1.3 矩阵、流表和物理口计数 | 支持对应动作的 CX5/固件/驱动组合 | VXLAN 互通不代表 VXLAN 已卸载，必须检查封装动作和命中 |
 
-### 5.2 D4-01/02：物理网络与无隧道基线
+### 5.2 DPU-P1.4-01/02：物理网络与无隧道基线
 
 VXLAN 常用于跨机架租户二层网络与云虚拟网络。VNI 为 24 位逻辑网络标识，VTEP 执行封装与解封装。VXLAN 本身不提供加密或身份认证，不能把它作为安全边界。
 
-两台主机分别完成 SR-IOV、switchdev、VF 直通与 OVS 安装。A、B 各保留一个实验 VF 和对应 representor，关闭第一天/第二天仍占用资源的其他端点。
+两台主机分别完成 SR-IOV、switchdev、VF 直通与 OVS 安装。A、B 各保留一个实验 VF 和对应 representor，关闭Phase 1.1 / Phase 1.2 仍占用资源的其他端点。
 
 通过 `devlink port show` 找到各自主机的**物理上联 representor/netdev**，记为 `UPLINK`；某些 CX5 配置下即为 `$PF`。不能把数据 VF 接口当作 uplink。先使用一张专用 `br-direct`，配置 rep↔uplink 的双向流，让两台 VM 在物理二层实验网中使用 `192.0.2.11/24`、`192.0.2.12/24` 互通：
 
@@ -541,9 +541,9 @@ sudo ovs-ofctl add-flow br-direct 'in_port=1,actions=output:2'
 sudo ovs-ofctl add-flow br-direct 'in_port=2,actions=output:1'
 ```
 
-执行前从旧桥移除这两个端口，确认没有 IP/路由依赖；一个接口不能同时属于两个桥。物理交换机为两端配置同一隔离实验 VLAN。先 ping，再按第三天方法测无隧道基线，保存速率、丢包、CPU、端口及流表证据。
+执行前从旧桥移除这两个端口，确认没有 IP/路由依赖；一个接口不能同时属于两个桥。物理交换机为两端配置同一隔离实验 VLAN。先 ping，再按Phase 1.3 方法测无隧道基线，保存速率、丢包、CPU、端口及流表证据。
 
-### 5.3 D4-03：配置 underlay 与 VXLAN
+### 5.3 DPU-P1.4-03：配置 underlay 与 VXLAN
 
 完成直连基线后停止发流，从 `br-direct` 移除实验端口。示例采用 OVS internal 端口承载 underlay IP，物理口加入 `br-underlay` 后不再保留主机 IP。该网段不得和管理网或其他路由冲突。
 
@@ -596,9 +596,9 @@ sudo ovs-appctl dpctl/dump-flows -m
 
 核对外层 VTEP IP、UDP 4789、VNI 100 与内层 VM 地址。这里“出网为 VXLAN”指 VM 跨节点流量以 VXLAN 形式从物理口发出，不包含公网 NAT/Internet 出口。若题目另需 Internet 出口，应独立设计网关、路由及安全策略，不能与本项混为一谈。
 
-### 5.4 D4-04：开关卸载与报告
+### 5.4 DPU-P1.4-04：开关卸载与报告
 
-按第三天流程分别关闭/开启 `hw-offload` 并重启。保持 underlay、overlay、VNI、MTU、VM CPU、消息长度和客户机分段聚合配置不变，执行 TCP/UDP、四种消息长度、1/4/8 并发。
+按Phase 1.3 流程分别关闭/开启 `hw-offload` 并重启。保持 underlay、overlay、VNI、MTU、VM CPU、消息长度和客户机分段聚合配置不变，执行 TCP/UDP、四种消息长度、1/4/8 并发。
 
 检查两端：
 
@@ -611,20 +611,20 @@ sudo ethtool -S "$UPLINK"
 
 卸载证据应覆盖 VM→隧道封装和隧道→VM 解封装两个方向；只有 rep↔rep 或普通 L2 动作卸载，不足以证明 VXLAN 卸载。若当前 CX5/固件/驱动不支持某动作，保留软件路径实测并列出限制，不手动添加绕过 OVS 的规则伪造卸载。
 
-报告按第三天表增加：节点、VTEP、VNI、underlay/overlay MTU、封装开销、分片状态、两端 CPU、封装/解封装卸载证据。分别比较“跨节点无隧道软件路径”“VXLAN 软件路径”“VXLAN 硬件路径”，不把不同拓扑的差异全部归因于卸载。硬件 TC 统计可能不含以太网头，字节计数应按同一层归一化再比较。
+报告按Phase 1.3 表增加：节点、VTEP、VNI、underlay/overlay MTU、封装开销、分片状态、两端 CPU、封装/解封装卸载证据。分别比较“跨节点无隧道软件路径”“VXLAN 软件路径”“VXLAN 硬件路径”，不把不同拓扑的差异全部归因于卸载。硬件 TC 统计可能不含以太网头，字节计数应按同一层归一化再比较。
 
-## 6. Phase 1.5 / 第五天：OVS-DPDK 与 VF 硬件卸载
+## 6. Phase 1.5：OVS-DPDK 与 VF 硬件卸载
 
 ### 6.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | D5-01 DPDK 原理及网卡支持调研 | 理解 PMD、轮询、hugepage 和批处理 | 查对应版本 PMD 支持表，比较内核与用户态路径 | CX5；Intel/Broadcom 作对照 | 区分“有 PMD”与“支持 OVS 硬件流表卸载” |
-| [ ] | D5-02 构建并初始化 OVS-DPDK | 建立用户态交换环境 | DPDK 源码构建、OVS 链接、hugepage、绑核、NUMA | 有可用大页和专用核心的主机 | 固定兼容版本，隔离 PMD 与 vCPU，减少跨 NUMA 访存 |
-| [ ] | D5-03 VF 虚拟机接入 DPDK representor | 保留 VF 直通端点并更换交换后端 | mlx5 bifurcated 驱动、representor devargs、netdev 桥 | switchdev CX5、两个 VF VM | PF 留在 mlx5_core；只将交给 VM 的 VF 绑定 vfio-pci |
-| [ ] | D5-04 DPDK 流卸载对照与报告 | 比较用户态软件交换与硬件 eSwitch | 复用矩阵，检查 rte_flow、PMD 与卸载计数 | 支持相应 rte_flow 动作的组合 | 与内核 TC 卸载分开取证，不能用 TC 表代替 DPDK 流表 |
+| [ ] | DPU-P1.5-01 DPDK 原理及网卡支持调研 | 理解 PMD、轮询、hugepage 和批处理 | 查对应版本 PMD 支持表，比较内核与用户态路径 | CX5；Intel/Broadcom 作对照 | 区分“有 PMD”与“支持 OVS 硬件流表卸载” |
+| [ ] | DPU-P1.5-02 构建并初始化 OVS-DPDK | 建立用户态交换环境 | DPDK 源码构建、OVS 链接、hugepage、绑核、NUMA | 有可用大页和专用核心的主机 | 固定兼容版本，隔离 PMD 与 vCPU，减少跨 NUMA 访存 |
+| [ ] | DPU-P1.5-03 VF 虚拟机接入 DPDK representor | 保留 VF 直通端点并更换交换后端 | mlx5 bifurcated 驱动、representor devargs、netdev 桥 | switchdev CX5、两个 VF VM | PF 留在 mlx5_core；只将交给 VM 的 VF 绑定 vfio-pci |
+| [ ] | DPU-P1.5-04 DPDK 流卸载对照与报告 | 比较用户态软件交换与硬件 eSwitch | 复用矩阵，检查 rte_flow、PMD 与卸载计数 | 支持相应 rte_flow 动作的组合 | 与内核 TC 卸载分开取证，不能用 TC 表代替 DPDK 流表 |
 
-### 6.2 D5-01：使用场景与设备支持
+### 6.2 DPU-P1.5-01：使用场景与设备支持
 
 DPDK 在用户态通过 PMD 批量收发包，配合大页、内存池和 NUMA 亲和性降低每包处理开销。适用于 NFV、高 pps 交换、流量发生器等；代价包括专用 CPU、忙轮询功耗、内存规划及驱动兼容要求。它不是普通 TCP 应用的自动加速开关，netperf 在客户机内仍使用 Linux TCP/UDP 栈。
 
@@ -637,7 +637,7 @@ DPDK 在用户态通过 PMD 批量收发包，配合大页、内存池和 NUMA �
 
 上表为系列示例，不保证所有 SKU、功能与软件组合均可用。绑定方法必须由 PMD 决定，不能套用“所有 DPDK 网卡都绑 vfio-pci”。
 
-### 6.3 D5-02：构建、大页、绑核与启动
+### 6.3 DPU-P1.5-02：构建、大页、绑核与启动
 
 本例采用同一 NUMA 节点的 2 MiB 大页 2048 页（4 GiB）、CPU 2/3 作 PMD、CPU 1 作 DPDK lcore；这些编号必须根据 `lscpu -e`、`numactl -H` 和网卡 `numa_node` 调整。保证主机与 VM 剩余内存充足；CPU mask 不是 vCPU pinning 配置。
 
@@ -677,7 +677,7 @@ export PKG_CONFIG_PATH=/opt/dpdk-23.11/lib/x86_64-linux-gnu/pkgconfig:/opt/dpdk-
 pkg-config --modversion libdpdk
 ```
 
-若实际库目录不同，调整上述路径及动态链接器配置。为 OVS 解压一份干净源码到独立构建目录，以免复用第一天的配置和对象文件：
+若实际库目录不同，调整上述路径及动态链接器配置。为 OVS 解压一份干净源码到独立构建目录，以免复用Phase 1.1 的配置和对象文件：
 
 ```bash
 cd "$LAB/src"
@@ -709,7 +709,7 @@ sudo ovs-vsctl get Open_vSwitch . dpdk_version
 
 `dpdk-socket-mem=4096` 仅对应单 socket/NUMA 0 示例，多 NUMA 应按实际节点配置。确认运行的是新二进制，日志无 PMD 探测或内存初始化失败。若所选版本不支持某配置项，依据该版本 man page 调整并记录，不忽略报错。
 
-### 6.4 D5-03：设备归属与两个 VF VM
+### 6.4 DPU-P1.5-03：设备归属与两个 VF VM
 
 | 对象 | 宿主机驱动/接口类型 | 用途 |
 | --- | --- | --- |
@@ -718,7 +718,7 @@ sudo ovs-vsctl get Open_vSwitch . dpdk_version
 | 客户机 VF | 客户机 mlx5_core | Linux 协议栈和 netperf |
 | VF representor | OVS `type=dpdk`，mlx5 PMD | 软件收发及 rte_flow 卸载入口 |
 
-沿用第一天创建 SR-IOV 和 switchdev、第二天直通方法；已经创建的 VF 不重复创建。旧内核桥不能继续持有这些 representor。添加 DPDK 桥及端口：
+沿用Phase 1.1 创建 SR-IOV 和 switchdev、Phase 1.2 直通方法；已经创建的 VF 不重复创建。旧内核桥不能继续持有这些 representor。添加 DPDK 桥及端口：
 
 ```bash
 sudo ovs-vsctl add-br br-dpdk -- set Bridge br-dpdk \
@@ -740,7 +740,7 @@ sudo ovs-appctl dpif-netdev/pmd-stats-show
 
 启动两个 VF VM，先双向 ping，再运行 netperf。VF 直通模型不使用 TAP 或 vhost-user。若额外比较 virtio/vhost-user，应另建实验组，设置共享内存与 vhost-user 端口，不能冒充 VF 直通组。
 
-### 6.5 D5-04：用户态软件转发与硬件卸载
+### 6.5 DPU-P1.5-04：用户态软件转发与硬件卸载
 
 先在 `hw-offload=false` 下完成软件 PMD 基线；再切换为 `true` 并重启 DPDK 构建的 `ovs-vswitchd`。两组保持 hugepage、PMD 核心、RX 队列、NUMA、VM 与 netperf 参数不变。
 
@@ -756,7 +756,7 @@ sudo ovs-appctl dpif-netdev/pmd-rxq-show
 
 本路径通过 DPDK `rte_flow` 而不是 Linux TC flower 下发硬件规则。`tc filter` 为空不构成 DPDK 卸载失败证据；应根据 OVS 卸载流标记、五元组计数、mlx5/端口硬件计数及日志判断。日志中的 `rte_flow` 创建失败、unsupported action 或资源耗尽必须记录为失败/部分卸载，不能仅凭开关值下结论。
 
-执行第三天完整矩阵并出报告。使用四种明确标签区分：内核软件、内核 TC 硬件、DPDK 软件、DPDK rte_flow 硬件。跨后端比较需声明队列/CPU 分配是否相同，无法完全一致的配置列为限制。
+执行Phase 1.3 完整矩阵并出报告。使用四种明确标签区分：内核软件、内核 TC 硬件、DPDK 软件、DPDK rte_flow 硬件。跨后端比较需声明队列/CPU 分配是否相同，无法完全一致的配置列为限制。
 
 PMD 可能在低流量甚至卸载后继续忙轮询，CPU 利用率不一定下降；同时记录 PMD cycles、包数、空轮询和吞吐。没有功耗实测不能据此断言更节能。
 

@@ -2,7 +2,7 @@
 
 ## 1. 范围与实验约定
 
-五天分别作为 Phase 1.1 至 Phase 1.5，按照“单卡功能→虚拟化→单卡性能→同机多卡→跨节点通信”的顺序组织。每个任务均列出名称、目的、方法、硬件、方案及选择原因。
+本阶段划分为 Phase 1.1 至 Phase 1.5，按照“单卡功能→虚拟化→单卡性能→同机多卡→跨节点通信”的顺序组织。每个任务均列出名称、目的、方法、硬件、方案及选择原因。
 
 本阶段以 NVIDIA CUDA 生态为命令示例。AMD ROCm、Intel oneAPI 可作为不同实验路线，但必须重新核对硬件和 API，不能将 CUDA 命令直接用于其他厂商设备。GPU 计算加速、GPU 虚拟化、RDMA 网络和 DPU 流表卸载属于不同能力，不相互替代。
 
@@ -15,7 +15,7 @@
 | 主机 | 两台 x86_64 Linux 服务器；建议每台至少 16 核、64 GiB 内存；直通需要 VT-d/AMD-Vi | 分离 GPU、MPI、网卡、监控与 VM 资源 |
 | GPU | 单卡任务至少一张 CUDA 支持的 GPU；多卡任务至少同机两张；跨节点每节点至少一张 | 资源不足时按任务边界停止，不混淆单卡与多卡 |
 | 型号示例 | A100/H100 等数据中心型号，或驱动/CUDA 兼容的实验 GPU | NVLink、MIG、vGPU、P2P、GPUDirect 支持须逐型号和拓扑核对；消费卡不默认支持这些能力 |
-| 网络 | 管理网独立；第五天可先测 Ethernet Socket，再选支持 RDMA 的 ConnectX 网卡和网络 | 先建立 TCP 基线，再判断 RDMA 收益 |
+| 网络 | 管理网独立；Phase 1.5 可先测 Ethernet Socket，再选支持 RDMA 的 ConnectX 网卡和网络 | 先建立 TCP 基线，再判断 RDMA 收益 |
 | 系统与工具链 | Ubuntu 22.04 LTS 示例；一组固定 NVIDIA 驱动、CUDA、cuBLAS、NCCL、MPI、Nsight 版本 | 按兼容表选择；不能只写“最新版” |
 | 供电与散热 | 机箱、供电、风道和插槽满足具体 GPU 要求 | 温度、功耗和降频直接影响性能与稳定性 |
 | 存储 | 独立 VM 镜像与原始日志空间 | 防止镜像并发写入及结果覆盖 |
@@ -37,17 +37,17 @@ mkdir -p "$LAB"/{src,build,images,results}
 
 示例中 `CUDA_VISIBLE_DEVICES=0,1` 是可见设备选择，不是权限隔离；容器也不是完整的 GPU 硬件隔离方案。
 
-## 2. Phase 1.1 / 第一天：GPU 架构与 CUDA 功能
+## 2. Phase 1.1：GPU 架构与 CUDA 功能
 
 ### 2.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | G1-01 架构与使用场景调研 | 区分 CPU/GPU、SIMT、显存与互连 | 查型号手册、Compute Capability、拓扑和应用模型 | 一张 CUDA GPU | 按数据并行与传输成本分析适用性，不将所有程序都视为 GPU 加速对象 |
-| [ ] | G1-02 驱动与 CUDA 环境建立 | 建立可复现的编译运行环境 | 匹配驱动/Toolkit，查询设备并编译样例 | Linux 主机、受支持 GPU | 固定版本并分开验证驱动、编译器、runtime |
-| [ ] | G1-03 单卡正确性与带宽验证 | 检查设备可用、内存访问和计算结果 | deviceQuery、bandwidthTest、vectorAdd、Compute Sanitizer | 同上 | 先验证正确性，再开展性能测试 |
+| [ ] | GPU-P1.1-01 架构与使用场景调研 | 区分 CPU/GPU、SIMT、显存与互连 | 查型号手册、Compute Capability、拓扑和应用模型 | 一张 CUDA GPU | 按数据并行与传输成本分析适用性，不将所有程序都视为 GPU 加速对象 |
+| [ ] | GPU-P1.1-02 驱动与 CUDA 环境建立 | 建立可复现的编译运行环境 | 匹配驱动/Toolkit，查询设备并编译样例 | Linux 主机、受支持 GPU | 固定版本并分开验证驱动、编译器、runtime |
+| [ ] | GPU-P1.1-03 单卡正确性与带宽验证 | 检查设备可用、内存访问和计算结果 | deviceQuery、bandwidthTest、vectorAdd、Compute Sanitizer | 同上 | 先验证正确性，再开展性能测试 |
 
-### 2.2 G1-01：架构与场景
+### 2.2 GPU-P1.1-01：架构与场景
 
 | 概念 | 内容及实验含义 |
 | --- | --- |
@@ -58,7 +58,7 @@ mkdir -p "$LAB"/{src,build,images,results}
 | Tensor Core | 用于支持的矩阵运算与数据类型；数值精度、累加方式和算法均影响性能与误差 |
 | 适用场景 | 矩阵计算、图像处理、科学计算和模型训练/推理；小任务或频繁主机传输可能受调度与拷贝限制 |
 
-### 2.3 G1-02：环境建立
+### 2.3 GPU-P1.1-02：环境建立
 
 驱动与 CUDA 从发行版或 NVIDIA 对应安装指南选择一条安装路径，避免混用 runfile、发行版包和容器宿主驱动。安装前核对 Secure Boot 模块签名、内核 headers、兼容表并安排重启；不通过关闭安全机制解决安装问题。
 
@@ -88,7 +88,7 @@ make -C Samples/0_Introduction/vectorAdd -j"$(nproc)"
 
 若改选使用 CMake 的新版本，按该 tag 的构建说明操作，并记录配置、目标架构和二进制路径。不能对旧 Toolkit 强行编译不支持的 GPU 架构。
 
-### 2.4 G1-03：功能和内存检查
+### 2.4 GPU-P1.1-03：功能和内存检查
 
 ```bash
 cd "$LAB/src/cuda-samples"
@@ -103,18 +103,18 @@ compute-sanitizer --tool memcheck ./Samples/0_Introduction/vectorAdd/vectorAdd
 
 阶段产物：硬件/拓扑记录、版本清单、编译命令、功能结果、错误日志。性能数值仅在实际执行后填写。
 
-## 3. Phase 1.2 / 第二天：GPU 虚拟化与镜像
+## 3. Phase 1.2：GPU 虚拟化与镜像
 
 ### 3.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | G2-01 GPU 共享与虚拟化比较 | 区分独占、分区、时间共享和容器 | 对比 PCIe passthrough、vGPU、MIG、MPS、容器 | GPU；部分路线需特定型号与许可 | 按隔离和可调度资源选择，不把不同机制混称 SR-IOV |
-| [ ] | G2-02 QEMU-KVM GPU 直通 | 在 VM 内运行真实 GPU 计算 | IOMMU、vfio-pci、QEMU/OVMF、客户机驱动 | 独立 IOMMU 组的 GPU；管理不依赖该卡 | 整卡独占直通路径清晰，适合作为虚拟化开销基线 |
-| [ ] | G2-03 制作 GPU 工具镜像 | 固定客户机软件和测试程序 | 安装驱动、CUDA、样例、NCCL 工具，关机封装 | VM、镜像存储 | 避免不同 VM 的工具版本差异影响结果 |
-| [ ] | G2-04 VM 计算与双 VM 通信 | 验证直通功能和后续通信基础 | VM 内运行样例；独立虚拟网卡双向 ping；可选两 VM NCCL | 两 VM；同时各用 GPU 需两张独立 GPU | 一张整卡不能同时直通两 VM；网络互通与 GPU 可用分别验证 |
+| [ ] | GPU-P1.2-01 GPU 共享与虚拟化比较 | 区分独占、分区、时间共享和容器 | 对比 PCIe passthrough、vGPU、MIG、MPS、容器 | GPU；部分路线需特定型号与许可 | 按隔离和可调度资源选择，不把不同机制混称 SR-IOV |
+| [ ] | GPU-P1.2-02 QEMU-KVM GPU 直通 | 在 VM 内运行真实 GPU 计算 | IOMMU、vfio-pci、QEMU/OVMF、客户机驱动 | 独立 IOMMU 组的 GPU；管理不依赖该卡 | 整卡独占直通路径清晰，适合作为虚拟化开销基线 |
+| [ ] | GPU-P1.2-03 制作 GPU 工具镜像 | 固定客户机软件和测试程序 | 安装驱动、CUDA、样例、NCCL 工具，关机封装 | VM、镜像存储 | 避免不同 VM 的工具版本差异影响结果 |
+| [ ] | GPU-P1.2-04 VM 计算与双 VM 通信 | 验证直通功能和后续通信基础 | VM 内运行样例；独立虚拟网卡双向 ping；可选两 VM NCCL | 两 VM；同时各用 GPU 需两张独立 GPU | 一张整卡不能同时直通两 VM；网络互通与 GPU 可用分别验证 |
 
-### 3.2 G2-01：方案比较
+### 3.2 GPU-P1.2-01：方案比较
 
 | 方案 | 目的与优点 | 硬件/软件要求 | 限制及选择原因 |
 | --- | --- | --- | --- |
@@ -126,9 +126,9 @@ compute-sanitizer --tool memcheck ./Samples/0_Introduction/vectorAdd/vectorAdd
 
 MIG、vGPU 和 MPS 为条件任务：只有型号与软件支持时才执行对应配置。变更 MIG 前停止所有 GPU 使用者，按型号文档评估复位/重启要求并记录原 profile；不在占用中的设备上试探模式切换。
 
-### 3.3 G2-02：整卡直通步骤
+### 3.3 GPU-P1.2-02：整卡直通步骤
 
-先使用普通 virtio 磁盘与网络安装可从串口管理的 Linux VM。QEMU 镜像安装、独立写入层和 TAP 网络可参照 [DPU 第二天](../../DPU/phase1/README.md#3-phase-12--第二天虚拟化与虚拟机镜像)，GPU 实验使用独立镜像与网桥，不复用正在运行的磁盘。
+先使用普通 virtio 磁盘与网络安装可从串口管理的 Linux VM。QEMU 镜像安装、独立写入层和 TAP 网络可参照 [DPU Phase 1.2](../../DPU/phase1/README.md#3-phase-12虚拟化与虚拟机镜像)，GPU 实验使用独立镜像与网桥，不复用正在运行的磁盘。
 
 在宿主机 BIOS 和 Linux 启动参数中启用 IOMMU，重启后核对 DMAR/IOMMU 日志。按实际地址设置：
 
@@ -171,30 +171,30 @@ sudo qemu-system-x86_64 -name gpu-a -enable-kvm -machine q35 -cpu host \
 
 大 BAR GPU 可能需要 Above 4G Decoding、足够的 64 位 MMIO 空间及额外 QEMU/固件设置；VM 枚举失败时按具体 GPU 的虚拟化指南处理，不复制未经验证的 BAR 或 ROM 参数。
 
-### 3.4 G2-03/04：镜像与验证
+### 3.4 GPU-P1.2-03/04：镜像与验证
 
-客户机内安装与目标 GPU、CUDA 匹配的驱动和工具链，重复第一天的 `nvidia-smi`、`deviceQuery`、`vectorAdd`、memcheck。直通模式下客户机运行真实 GPU 驱动；宿主机该卡使用 vfio-pci，不要求同时在宿主 `nvidia-smi` 中可见。
+客户机内安装与目标 GPU、CUDA 匹配的驱动和工具链，重复Phase 1.1 的 `nvidia-smi`、`deviceQuery`、`vectorAdd`、memcheck。直通模式下客户机运行真实 GPU 驱动；宿主机该卡使用 vfio-pci，不要求同时在宿主 `nvidia-smi` 中可见。
 
-镜像内加入固定版本 CUDA Samples、NCCL、MPI、nccl-tests、Nsight 工具；构建方法分别见第四/五天。保留源码 commit 与构建参数。清理临时凭据，按发行版通用化流程为每台 VM 生成独立 machine-id、SSH host key，关机后记录镜像散列及 `qemu-img check`。
+镜像内加入固定版本 CUDA Samples、NCCL、MPI、nccl-tests、Nsight 工具；构建方法分别见Phase 1.4 / Phase 1.5。保留源码 commit 与构建参数。清理临时凭据，按发行版通用化流程为每台 VM 生成独立 machine-id、SSH host key，关机后记录镜像散列及 `qemu-img check`。
 
 若使用 backing file，每台 VM 创建自己的写入层，交付时导出独立 qcow2 或完整登记依赖链。镜像不包含固定 SSH 私钥，不提交到 Git；登记存储路径、散列、GPU 架构和版本清单。
 
-第二台 VM 使用独立镜像、VARS 文件、TAP、MAC、名称及 GPU BDF。在两个客户机为数据网配置 `192.0.2.21/24`、`192.0.2.22/24`，双向 ping。使用两张 GPU 时可运行第四天的 MPI NCCL 测试，每台 VM 一张卡；只有一张卡时两 VM 网络互通仍可单独验证，但双 VM GPU 通信标为未执行。
+第二台 VM 使用独立镜像、VARS 文件、TAP、MAC、名称及 GPU BDF。在两个客户机为数据网配置 `192.0.2.21/24`、`192.0.2.22/24`，双向 ping。使用两张 GPU 时可运行Phase 1.4 的 MPI NCCL 测试，每台 VM 一张卡；只有一张卡时两 VM 网络互通仍可单独验证，但双 VM GPU 通信标为未执行。
 
 阶段产物：共享方案对照、IOMMU 组及设备归属、启动参数、镜像清单、VM 功能检查与网络互通日志。
 
-## 4. Phase 1.3 / 第三天：单卡计算、访存与性能分析
+## 4. Phase 1.3：单卡计算、访存与性能分析
 
 ### 4.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | G3-01 主机与设备传输矩阵 | 量化小传输、带宽及内存页锁定影响 | pageable/pinned、同步/异步拷贝、不同长度 | 一张 GPU、足量主机内存 | 将传输瓶颈与 kernel 计算瓶颈分开 |
-| [ ] | G3-02 计算规模与精度对照 | 测量计算效率及数值误差 | GEMM，固定 M/N/K、FP32/FP16 等模式、核对参考结果 | 支持对应类型的 GPU | 数据类型或 Tensor Core 改变时必须同时报告精度条件 |
-| [ ] | G3-03 stream 与 kernel 优化 | 理解并发、访存和同步开销 | 固定工作量比较 1/2/4 stream、合并访问与流水线 | 同上 | 一次改变一个变量，避免把数据量变化当优化收益 |
-| [ ] | G3-04 裸机与 VM 性能对照 | 判断直通与 CPU/NUMA 配置影响 | 同一卡先裸机后直通，固定版本、功耗和输入 | 可直通 GPU | 同一设备时分复用，不用不同型号机器推断虚拟化开销 |
+| [ ] | GPU-P1.3-01 主机与设备传输矩阵 | 量化小传输、带宽及内存页锁定影响 | pageable/pinned、同步/异步拷贝、不同长度 | 一张 GPU、足量主机内存 | 将传输瓶颈与 kernel 计算瓶颈分开 |
+| [ ] | GPU-P1.3-02 计算规模与精度对照 | 测量计算效率及数值误差 | GEMM，固定 M/N/K、FP32/FP16 等模式、核对参考结果 | 支持对应类型的 GPU | 数据类型或 Tensor Core 改变时必须同时报告精度条件 |
+| [ ] | GPU-P1.3-03 stream 与 kernel 优化 | 理解并发、访存和同步开销 | 固定工作量比较 1/2/4 stream、合并访问与流水线 | 同上 | 一次改变一个变量，避免把数据量变化当优化收益 |
+| [ ] | GPU-P1.3-04 裸机与 VM 性能对照 | 判断直通与 CPU/NUMA 配置影响 | 同一卡先裸机后直通，固定版本、功耗和输入 | 可直通 GPU | 同一设备时分复用，不用不同型号机器推断虚拟化开销 |
 
-### 4.2 G3-01：传输测试
+### 4.2 GPU-P1.3-01：传输测试
 
 基础样例：
 
@@ -223,7 +223,7 @@ cd "$LAB/src/cuda-samples"
 
 分配与首次上下文初始化放在计时区外，端到端耗时包含全部传输与同步。CUDA Events 用于设备时间，同步后的主机单调时钟用于端到端时间；不能只测异步 API 的返回时间。
 
-### 4.3 G3-02：矩阵计算与正确性
+### 4.3 GPU-P1.3-02：矩阵计算与正确性
 
 选用 cuBLAS 或匹配版本的 cuBLASLt 示例，固定并记录：
 
@@ -240,7 +240,7 @@ cd "$LAB/src/cuda-samples"
 
 输入缩小精度可能提高吞吐但增加误差，报告必须同时列数据类型、累加类型、容差和最大误差；不只写“精度一致”。
 
-### 4.4 G3-03：分析方法
+### 4.4 GPU-P1.3-03：分析方法
 
 对同一可参数化程序保存带行号信息的构建，Release 测量不启用 `-G`。性能采样与正式结果分别运行：
 
@@ -254,7 +254,7 @@ compute-sanitizer --tool memcheck ./gpu_bench
 
 先从 Nsight Systems 检查 CPU 空洞、H2D/D2H、同步与 stream 重叠，再从 Nsight Compute 检查 memory throughput、SM 利用、occupancy、寄存器压力与访存合并。高 occupancy 不自动等于高性能；每个改动需要相同工作量的前后数据。
 
-### 4.5 G3-04：裸机/VM 与报告
+### 4.5 GPU-P1.3-04：裸机/VM 与报告
 
 同一 GPU 先在裸机完成矩阵，再释放并直通到 VM 重跑。两边保持驱动/库兼容版本、输入、GPU 时钟策略、功率上限、温度区间和 CPU/NUMA 位置一致；不支持完全一致时列出差异。不要为固定条件擅自修改生产环境功率或锁频。
 
@@ -264,18 +264,18 @@ compute-sanitizer --tool memcheck ./gpu_bench
 
 报告至少包含重复值、均值和标准差。若报告 P95/P99，需保留每次样本、说明分位数算法并提供足够样本；样例仅提供平均值时不能补写尾延迟。虚拟化耗时开销为 `(VM时间-裸机时间)/裸机时间×100%`；吞吐与延迟分别用各自定义，不能混用方向。
 
-## 5. Phase 1.4 / 第四天：同机多 GPU 通信
+## 5. Phase 1.4：同机多 GPU 通信
 
 ### 5.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | G4-01 多卡拓扑与 P2P 能力确认 | 确定通信经过 PCIe、NVLink 或主机内存 | topo、P2P 查询、带宽与延迟样例 | 同机两张 GPU；NVLink 为条件项 | 设备数量不代表具备直接互访能力 |
-| [ ] | G4-02 NCCL 构建和集合通信 | 建立 AllReduce/AllGather 基线 | 固定 NCCL 与 nccl-tests，验证结果和带宽 | 至少两卡及兼容 CUDA | 标准集合通信便于观察消息规模与拓扑影响 |
-| [ ] | G4-03 P2P 路径对照 | 量化直接互访与回退路径差异 | 默认配置对比 `NCCL_P2P_DISABLE=1`，保留日志 | 支持 P2P 的 GPU 对 | 只禁用一个传输能力，不把配置意图当实际路径 |
-| [ ] | G4-04 多卡报告 | 识别小消息和大消息瓶颈 | 扫描长度、记录 algbw/busbw、正确性和拓扑 | 同上 | 区分算法带宽与换算后的总线带宽 |
+| [ ] | GPU-P1.4-01 多卡拓扑与 P2P 能力确认 | 确定通信经过 PCIe、NVLink 或主机内存 | topo、P2P 查询、带宽与延迟样例 | 同机两张 GPU；NVLink 为条件项 | 设备数量不代表具备直接互访能力 |
+| [ ] | GPU-P1.4-02 NCCL 构建和集合通信 | 建立 AllReduce/AllGather 基线 | 固定 NCCL 与 nccl-tests，验证结果和带宽 | 至少两卡及兼容 CUDA | 标准集合通信便于观察消息规模与拓扑影响 |
+| [ ] | GPU-P1.4-03 P2P 路径对照 | 量化直接互访与回退路径差异 | 默认配置对比 `NCCL_P2P_DISABLE=1`，保留日志 | 支持 P2P 的 GPU 对 | 只禁用一个传输能力，不把配置意图当实际路径 |
+| [ ] | GPU-P1.4-04 多卡报告 | 识别小消息和大消息瓶颈 | 扫描长度、记录 algbw/busbw、正确性和拓扑 | 同上 | 区分算法带宽与换算后的总线带宽 |
 
-### 5.2 G4-01：P2P 核查
+### 5.2 GPU-P1.4-01：P2P 核查
 
 GPU 需在宿主机 NVIDIA 驱动下使用；若刚完成直通实验，先关 VM 并按恢复流程重新绑定。不能在 VFIO 持有期间同时跑裸机 CUDA。
 
@@ -288,7 +288,7 @@ make -C Samples/5_Domain_Specific/p2pBandwidthLatencyTest -j"$(nproc)"
 
 查询每对 GPU 是否支持 peer access。相同 PCIe switch、跨 CPU socket、NVLink 连接分别记录；不支持 P2P 时保留回退测试，但不能生成 P2P 开/关收益。普通 CUDA IPC/P2P 不能假设跨 VM 可用。
 
-### 5.3 G4-02：固定软件与单机 NCCL
+### 5.3 GPU-P1.4-02：固定软件与单机 NCCL
 
 按 NCCL 安装指南安装与 CUDA/驱动兼容的开发库，记录包版本与库路径。然后固定 nccl-tests commit：
 
@@ -315,7 +315,7 @@ CUDA_VISIBLE_DEVICES=0,1 ./build/all_gather_perf \
 
 `-b 128 -f 2` 覆盖 128、256、512 等倍增点，不会覆盖 1500。记录程序实际打印的 size，某些 collective 会按 rank/元素数调整请求长度。显存不足时降低上限并记录，不能关闭正确性检查来绕过失败。
 
-### 5.4 G4-03：传输对照与判定
+### 5.4 GPU-P1.4-03：传输对照与判定
 
 同一测试在两个独立进程环境运行：
 
@@ -332,7 +332,7 @@ NCCL_P2P_DISABLE=1 NCCL_DEBUG=INFO CUDA_VISIBLE_DEVICES=0,1 \
 
 测试矩阵为 AllReduce/AllGather × 默认/P2P 禁用 × 消息长度，每格至少 3 轮，区分 in-place/out-of-place。正确性要求错误计数为 0；失败时保留日志并停止该格性能归纳。
 
-### 5.5 G4-04：报告口径
+### 5.5 GPU-P1.4-04：报告口径
 
 `algbw` 是算法数据量与时间换算，`busbw` 是按 collective 和 rank 数换算的指标，不是硬件传感器直接测得的链路带宽。例如 N 个 rank 的 AllReduce 常用 `busbw = algbw × 2(N-1)/N`，AllGather 使用其对应公式；与所选 nccl-tests 版本说明核对，且不把两个指标相加。
 
@@ -342,18 +342,18 @@ NCCL_P2P_DISABLE=1 NCCL_DEBUG=INFO CUDA_VISIBLE_DEVICES=0,1 \
 
 NVLink 不存在时只分析 PCIe 路径；一张卡时本阶段多卡任务不执行，不将单 rank collective 当成双卡通信。
 
-## 6. Phase 1.5 / 第五天：跨节点 NCCL、RDMA 与 GPUDirect
+## 6. Phase 1.5：跨节点 NCCL、RDMA 与 GPUDirect
 
 ### 6.1 Task list
 
 | 状态 | 任务名称 | 目的 | 方法 | 硬件 | 方案与原因 |
 | --- | --- | --- | --- | --- | --- |
-| [ ] | G5-01 跨节点网络基线 | 排除地址、路由和 CPU 网络瓶颈 | ping、受控网络吞吐测试、接口与 NUMA 检查 | 两节点，各一 GPU，独立数据网 | 先验证网络，再解释 GPU 集合通信性能 |
-| [ ] | G5-02 MPI-NCCL Socket 基线 | 建立可工作的跨机集合通信 | MPI 版 nccl-tests，一节点一 rank/一 GPU | 两节点、可达 Ethernet 网络 | 固定 rank 与设备映射，先避免多卡调度复杂性 |
-| [ ] | G5-03 RDMA/GPUDirect 条件实验 | 比较主机中转与 GPU 直接网络传输 | RDMA 连通检查、NCCL IB transport、GDR 证据 | 兼容 GPU/NIC/PCIe 拓扑/驱动及 IB 或 RoCE 网络 | 单独验证网络 RDMA 与 GPU 内存 RDMA，不把二者等同 |
-| [ ] | G5-04 跨节点性能与专业方向报告 | 解释带宽、延迟、拓扑与瓶颈 | 长度扫描、Socket/RDMA/GDR 对照、重复统计 | 同上 | 以实际传输日志和数据归因，不用开关状态代替证据 |
+| [ ] | GPU-P1.5-01 跨节点网络基线 | 排除地址、路由和 CPU 网络瓶颈 | ping、受控网络吞吐测试、接口与 NUMA 检查 | 两节点，各一 GPU，独立数据网 | 先验证网络，再解释 GPU 集合通信性能 |
+| [ ] | GPU-P1.5-02 MPI-NCCL Socket 基线 | 建立可工作的跨机集合通信 | MPI 版 nccl-tests，一节点一 rank/一 GPU | 两节点、可达 Ethernet 网络 | 固定 rank 与设备映射，先避免多卡调度复杂性 |
+| [ ] | GPU-P1.5-03 RDMA/GPUDirect 条件实验 | 比较主机中转与 GPU 直接网络传输 | RDMA 连通检查、NCCL IB transport、GDR 证据 | 兼容 GPU/NIC/PCIe 拓扑/驱动及 IB 或 RoCE 网络 | 单独验证网络 RDMA 与 GPU 内存 RDMA，不把二者等同 |
+| [ ] | GPU-P1.5-04 跨节点性能与专业方向报告 | 解释带宽、延迟、拓扑与瓶颈 | 长度扫描、Socket/RDMA/GDR 对照、重复统计 | 同上 | 以实际传输日志和数据归因，不用开关状态代替证据 |
 
-### 6.2 G5-01：节点与网络准备
+### 6.2 GPU-P1.5-01：节点与网络准备
 
 | 节点 | 数据网地址 | GPU | 执行目录 |
 | --- | --- | --- | --- |
@@ -366,9 +366,9 @@ NVLink 不存在时只分析 PCIe 路径；一张卡时本阶段多卡任务不�
 
 MPI 启动控制连接和 NCCL 数据连接都必须被允许；按 MPI/NCCL 版本配置限定端口或仅在隔离实验网按对端 IP 放行，不全局关闭防火墙。
 
-### 6.3 G5-02：编译 MPI 版与 Socket 测试
+### 6.3 GPU-P1.5-02：编译 MPI 版与 Socket 测试
 
-两节点安装相同 Open MPI 与开发库，NCCL、CUDA 和测试程序采用相同版本。为避免复用第四天对象文件，重新构建：
+两节点安装相同 Open MPI 与开发库，NCCL、CUDA 和测试程序采用相同版本。为避免复用Phase 1.4 对象文件，重新构建：
 
 ```bash
 sudo apt-get install openmpi-bin libopenmpi-dev
@@ -397,7 +397,7 @@ mpirun -np 2 --host gpu-a:1,gpu-b:1 --map-by ppr:1:node \
 
 运行 AllGather 并单点补测 1500 B。保存 NCCL 日志，确认实际为 Socket transport。MPI 启动成功或两主机能 ping，不构成 NCCL 已连通的充分证据；要求 collective 完成且错误计数为 0。
 
-### 6.4 G5-03：RDMA 与 GPUDirect
+### 6.4 GPU-P1.5-03：RDMA 与 GPUDirect
 
 先检查网卡和网络：
 
@@ -436,7 +436,7 @@ mpirun -np 2 --host gpu-a:1,gpu-b:1 --map-by ppr:1:node \
 
 第三组需日志、受支持 GPU-buffer 诊断及 NIC/拓扑证据相互支持；仅看到 `NET/IB` 不足以证明 GPUDirect。若无法控制或确认 GDR，中转/直接两组标为“路径未确认”，不输出直接对比结论。该实验主线在裸机进行，不能假设同样的 GDR 路径可跨 VM 使用。
 
-### 6.5 G5-04：矩阵与报告
+### 6.5 GPU-P1.5-04：矩阵与报告
 
 对每种已确认路径执行 AllReduce/AllGather × 128/256/512/1500 B × 1/4/16/64 MiB 代表点（取这些长度的并集，不是二者相乘），并可增加倍增扫描；每格预热 10 次、正式至少 100 次，至少 3 轮。固定 2 rank、一节点一 GPU，更多节点或多卡另列扩展组。
 
