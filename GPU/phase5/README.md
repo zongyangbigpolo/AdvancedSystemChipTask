@@ -14,6 +14,8 @@
 | [ ] | GPU-P5-02 MPI-NCCL Socket 基线 | 建立可工作的跨机集合通信 | MPI 版 nccl-tests，一节点一 rank/一 GPU | 两节点、可达 Ethernet 网络 | 固定 rank 与设备映射，先避免多卡调度复杂性 |
 | [ ] | GPU-P5-03 RDMA/GPUDirect 条件实验 | 比较主机中转与 GPU 直接网络传输 | RDMA 连通检查、NCCL IB transport、GDR 证据 | 兼容 GPU/NIC/PCIe 拓扑/驱动及 IB 或 RoCE 网络 | 单独验证网络 RDMA 与 GPU 内存 RDMA，不把二者等同 |
 | [ ] | GPU-P5-04 跨节点性能与专业方向报告 | 解释带宽、延迟、拓扑与瓶颈 | 长度扫描、Socket/RDMA/GDR 对照、重复统计 | 同上 | 以实际传输日志和数据归因，不用开关状态代替证据 |
+| [ ] | GPU-P5-05 跨节点训练与断点恢复 | 验证模型训练和状态恢复完整性 | 复用 DDP、两节点 torchrun、完整 checkpoint、连续参考 | 每节点一 GPU、可达数据网络 | 单纯跑通 AllReduce 不代表训练可交付 |
+| [ ] | GPU-P5-06 慢 rank 定位与通信重叠 | 区分算力、数据和网络等待 | 应用内短延迟、逐 rank trace、bucket 单变量对照 | 隔离双节点训练环境 | 用可控复现和根因证据替代盲目增加 timeout |
 
 ## 2. GPU-P5-01：节点与网络准备
 
@@ -109,3 +111,43 @@ mpirun -np 2 --host gpu-a:1,gpu-b:1 --map-by ppr:1:node \
 分析小消息是否受启动/同步时延限制，大消息是否受 NIC、PCIe、NUMA 或 GPU 内存限制。比较 Socket 与 RDMA 时区分协议、CPU 与内存路径变化；比较 GDR 时确保网络 transport 不变。交换机与网卡拥塞、链路降速、软件插件缺失和错误恢复均需记录。
 
 性能增益按同口径吞吐计算 `(新路径-基线)/基线×100%`；延迟降低按 `(基线-新路径)/基线×100%`。不从 NCCL 算法带宽推断公网性能，也不从利用率推断功耗。无实际测量时仅保留表格与操作方法。
+
+## 6. GPU-P5-05：两节点训练与可验证恢复
+
+复用 [Phase 4 的 DDP 程序](../phase4/README.md)，每节点各一 GPU，使用完全相同的代码、模型和版本。两节点分别设置 `NODE_RANK=0/1`，管理地址按实际替换：
+
+```bash
+torchrun --nnodes=2 --nproc-per-node=1 \
+  --node-rank="${NODE_RANK:?未设置节点编号}" \
+  --master-addr=198.51.100.21 --master-port=29500 \
+  "$LAB/src/ddp_train.py" --global-batch 128 --steps 200 \
+  --output "$LAB/results/ddp-cross-node"
+```
+
+NCCL Socket/RDMA 配置继承本阶段已确认的网络方案，保存实际 transport 日志；torchrun 只负责启动与 rendezvous，不会自动修好数据网络。两个节点的输出目录须明确是本地还是共享存储，每个 rank 日志名称唯一，避免覆盖。
+
+给程序增加 `--save-step`、`--checkpoint-dir`、`--resume` 接口后做以下三次实验：
+
+1. 固定种子连续运行 200 步，作为参考。
+2. 同一初始状态运行至完整第 100 步，所有 rank 在相同 step 边界协作保存，正常退出。
+3. 重新启动全部 rank，从 checkpoint 恢复到第 200 步，比较 101～200 步 loss、最终参数与参考。
+
+保存模型、optimizer、scheduler、AMP scaler、global step、epoch/采样器位置及每 rank CPU/CUDA RNG 状态。rank 0 可保存共享模型状态，但随机/数据状态必须逐 rank 保存；所有写入完成后标记 checkpoint 完整，再允许加载。仅写 `model.state_dict()` 不算训练完整恢复。只加载受信任的 checkpoint，遵循所选 PyTorch 版本的反序列化安全要求。
+
+从已知完整 checkpoint 恢复的计划重启不等于自动弹性容错；若增加强制退出测试，另列恢复点丢失步数和退出方式，不宣称支持任意故障无损恢复。精确比较前固定数据顺序与确定性条件，不支持位级一致时使用预设容差。
+
+交付启动配置、完整性清单、各 rank 恢复日志、连续/恢复差异，以及保存与加载耗时。恢复性能单列，不混入稳态训练吞吐。
+
+## 7. GPU-P5-06：慢 rank 与 bucket 调优
+
+参考 [DDP 同步与处理速度差异说明](https://docs.pytorch.org/tutorials/intermediate/ddp_tutorial.html) 和 [Nsight Systems](https://docs.nvidia.com/nsight-systems/)，给训练代码增加测试开关：仅 rank 1 在指定非保存步骤、forward 前等待 100 ms，其他步骤不变。该扰动只作用于自有进程，不修改交换机、不丢弃他人流量、不占满整个 GPU。
+
+分别采基线、扰动、移除扰动三次短时间线。每 rank 独立输出，定位“最先延迟的计算或取数”以及“其他 rank 随后的 collective 等待”，不要把等待位置当作原始故障发生点。跨节点 trace 时钟可能有偏差，按共同 step 和本地持续时间关联，未校时时不直接相减跨机绝对时间戳。
+
+故障恢复后，固定模型、全局 batch、精度、网络 transport，比较 DDP `bucket_cap_mb=1/25/64`（按该版本单位含义记录）。检查实际 bucket 划分和 backward/AllReduce 重叠；小模型可能只有一个 bucket，参数变化不构成实际分组变化。只测 steady state，排除初次 bucket 重建与 profiler 扰动。
+
+| 运行 | rank/step | 主机取数/提交 | GPU 计算 | collective 等待 | 实际 bucket | 完成时间 | 根因证据 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 待执行 | 待记录 | — | — | — | 待记录 | — | — |
+
+交付注入开关、所有 rank 日志、三组 trace、bucket 配置与重复测量。结果允许“无收益”或“更慢”；不能以增加 timeout、关闭正确性检查或换成更小模型作为原故障的修复结论。

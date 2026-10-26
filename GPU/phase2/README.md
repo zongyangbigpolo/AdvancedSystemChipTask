@@ -14,6 +14,8 @@
 | [ ] | GPU-P2-02 QEMU-KVM GPU 直通 | 在 VM 内运行真实 GPU 计算 | IOMMU、vfio-pci、QEMU/OVMF、客户机驱动 | 独立 IOMMU 组的 GPU；管理不依赖该卡 | 整卡独占直通路径清晰，适合作为虚拟化开销基线 |
 | [ ] | GPU-P2-03 制作 GPU 工具镜像 | 固定客户机软件和测试程序 | 安装驱动、CUDA、样例、NCCL 工具，关机封装 | VM、镜像存储 | 避免不同 VM 的工具版本差异影响结果 |
 | [ ] | GPU-P2-04 VM 计算与双 VM 通信 | 验证直通功能和后续通信基础 | VM 内运行样例；独立虚拟网卡双向 ping；可选两 VM NCCL | 两 VM；同时各用 GPU 需两张独立 GPU | 一张整卡不能同时直通两 VM；网络互通与 GPU 可用分别验证 |
+| [ ] | GPU-P2-05 容器化交付与设备分配验证 | 制作可重建的计算环境 | 固定镜像 digest、按 UUID 分配 GPU、运行正确性测试 | 单 GPU；完整分配对照建议两 GPU | 区分镜像复现、runtime 设备分配与环境变量过滤 |
+| [ ] | GPU-P2-06 NUMA 位置对传输的影响 | 测量 CPU/内存放置带来的 I/O 开销 | 同一 GPU 对照本地/远端 CPU 与内存绑定 | 至少两个 NUMA 节点的主机 | 不更换 GPU，只改变主机侧资源位置便于归因 |
 
 ## 2. GPU-P2-01：方案比较
 
@@ -83,3 +85,43 @@ sudo qemu-system-x86_64 -name gpu-a -enable-kvm -machine q35 -cpu host \
 第二台 VM 使用独立镜像、VARS 文件、TAP、MAC、名称及 GPU BDF。在两个客户机为数据网配置 `192.0.2.21/24`、`192.0.2.22/24`，双向 ping。使用两张 GPU 时可参照 [Phase 5 的 MPI NCCL 方法](../phase5/README.md)，将启动目标改为这两台 VM，每台 VM 一张卡；只有一张卡时两 VM 网络互通仍可单独验证，但双 VM GPU 通信标为未执行。
 
 阶段产物：共享方案对照、IOMMU 组及设备归属、启动参数、镜像清单、VM 功能检查与网络互通日志。
+
+## 5. GPU-P2-05：可重建容器与设备范围
+
+按 [NVIDIA Container Toolkit 官方样例](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/sample-workload.html) 安装匹配 runtime，宿主驱动仍由主机维护。先结束 VFIO 直通持有者并恢复 NVIDIA 驱动，不能把同一 GPU 同时分配给 VM 和容器。
+
+选择与宿主驱动兼容的 CUDA 开发镜像，记录实际 `仓库@sha256:...`，不要只写 `latest`。在实验目录编写 Dockerfile：固定基础 digest、依赖和样例 commit，构建 Phase 1 的 `vectorAdd` 与自写转置，运行时使用非 root 用户；不在镜像内安装宿主内核驱动或写入访问凭据。
+
+```bash
+export GPU_UUID='<从 nvidia-smi -L 核对的实际 GPU UUID>'
+export LAB_IMAGE='<已构建并记录 ID 的实验镜像>'
+docker run --rm --runtime=nvidia --gpus "device=$GPU_UUID" \
+  "$LAB_IMAGE" nvidia-smi -L
+```
+
+完成程序安装路径后，在相同设备分配参数下运行 vectorAdd、转置和校验脚本。保存 build 日志、镜像 ID/digest、运行命令、容器内版本和设备 UUID。
+
+做三组功能对照：显式不注入 GPU；只分配 UUID-A；有两卡时仅分配 UUID-B。负向组不传 `--gpus`，并设置 `NVIDIA_VISIBLE_DEVICES=void`，避免镜像或默认 runtime 的设备设置导致误暴露：
+
+```bash
+docker run --rm --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=void \
+  "$LAB_IMAGE" nvidia-smi -L
+```
+
+负向组预期无法访问 GPU，保留实际返回码；再用 CUDA 设备查询和真实 kernel 验证两组正向分配范围，不只看环境变量。容器内设备可能重新编号为 0，必须按 UUID/BDF 对应实物；`CUDA_VISIBLE_DEVICES` 只是应用层过滤，不能冒充 runtime 的设备授权或安全隔离审计。
+
+验收为从固定配置重建后两次正确性一致、只使用分配设备、退出后本次进程不再占用 GPU。保存失败的“未分配设备”日志，不为让它通过而增加 `--privileged`、映射整个 `/dev` 或挂载 Docker socket。
+
+## 6. GPU-P2-06：CPU/内存位置的可测对照
+
+先在裸机读取 `nvidia-smi topo -m`、`numactl -H` 和 GPU PCI `numa_node`，确认哪个节点本地连接。示例假设 GPU 本地 NUMA=0、远端=1，必须按实际替换：
+
+```bash
+export BW="$LAB/src/cuda-samples/Samples/1_Utilities/bandwidthTest/bandwidthTest"
+numactl --cpunodebind=0 --membind=0 "$BW" --memory=pinned
+numactl --cpunodebind=1 --membind=1 "$BW" --memory=pinned
+```
+
+增加“CPU 本地、内存远端”和“CPU 远端、内存本地”两组；保持 GPU、消息长度、进程数量和温度区间不变，每组至少三轮。记录实际内存分布与 pinned allocation 是否遵从绑定，不能仅凭命令推断位置。单 NUMA 主机标为不适用，不用逻辑 CPU 编号伪装远端节点。
+
+若扩展至 VM，额外记录 QEMU vCPU pinning、host 内存后端及 NUMA 策略，并让客户机跑同一测试；客户机内的虚拟 NUMA 编号不能直接代表物理 PCIe 位置。交付拓扑图、绑定配置、H2D/D2H 结果和主机侧位置证据。

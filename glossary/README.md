@@ -1,6 +1,6 @@
 # 名词与缩写
 
-本文件集中记录 DPU、GPU 各阶段使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
+本文件集中记录 DPU、GPU、NPU 各阶段使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
 
 ## 1. 通用硬件、系统与虚拟化
 
@@ -9,6 +9,7 @@
 | CPU | Central Processing Unit | 中央处理器，承担通用计算与系统控制 |
 | GPU | Graphics Processing Unit | 图形处理器，也用于数据并行计算 |
 | DPU | Data Processing Unit | 承担网络、存储或安全数据处理的处理器/设备；具备网卡卸载能力不等于具备独立处理器 |
+| NPU | Neural Processing Unit | 面向神经网络计算的处理单元；本仓库不以此缩写表示 Network Processing Unit |
 | NIC | Network Interface Card | 网络接口卡 |
 | PCIe | Peripheral Component Interconnect Express | CPU 与 GPU、网卡等设备之间的高速互连 |
 | BDF | Bus:Device.Function | PCI 设备功能地址；Linux 完整地址还包含 domain，例如 `0000:41:00.0` |
@@ -145,8 +146,53 @@
 | nvidia-peermem | NVIDIA peer-memory kernel module | 部分 GPUDirect RDMA 组合使用的内存注册模块；加载成功不等于传输已采用 GDR |
 | UUID | Universally Unique Identifier | 设备或实例唯一标识，比不稳定的枚举编号更适合实验记录 |
 | P95 / P99 | 95th / 99th Percentile | 第 95/99 百分位，需保留样本并说明统计方法 |
+| CUDA Graph | CUDA Graph | 预先定义/捕获计算依赖并重复提交的机制，需单独考虑建图与实例化成本 |
+| capture / replay | Stream Capture / Graph Replay | 捕获 stream 操作构建图，与重复执行已实例化图 |
+| bank conflict | Shared Memory Bank Conflict | shared memory 访问映射至相同 bank 导致的串行化，具体规则依架构 |
+| coalescing | Memory Coalescing | 将线程的全局访存合并为高效内存事务，不等同于接收包聚合 |
+| AMP | Automatic Mixed Precision | 按算子选择计算类型的混合精度机制，不等同于简单转换整个模型为 FP16 |
+| autocast / GradScaler | Automatic Casting / Gradient Scaler | 自动精度选择与梯度缩放；是否需要缩放依数据类型及计算路径 |
+| DDP | Distributed Data Parallel | 多进程数据并行训练，各模型副本通过通信同步梯度 |
+| microbatch | Microbatch | 梯度累积中一次前向/反向使用的局部样本批 |
+| gradient accumulation | Gradient Accumulation | 多个 microbatch 累积梯度后执行一次参数更新，需正确归一化与同步 |
+| activation checkpoint | Activation Checkpointing | 反向时重算部分激活以减少显存；不同于保存到磁盘的训练恢复状态 |
+| checkpoint / RNG | Training Checkpoint / Random Number Generator | 训练恢复状态与随机数生成器；完整恢复通常需要模型以外的优化器、数据和随机状态 |
+| strong / weak scaling | Strong / Weak Scaling | 固定全局工作量/固定每设备工作量的扩展实验，二者效率不可混报 |
+| bucket | Gradient Bucket | DDP 组织梯度通信的分组，实际划分与参数顺序、规模及版本有关 |
+| straggler | Straggler Rank | 先因计算、数据或其他因素变慢的 rank，其他 rank 的等待不一定是根因 |
+| rendezvous | Distributed Rendezvous | 分布式参与者建立作业成员与初始化连接的过程，不代表数据通信已成功 |
+| OOM | Out Of Memory | 内存资源不足，需记录失败规模和分配条件，不编造失败运行的耗时 |
 
-## 4. 单位与测量口径
+## 4. NPU、模型部署与算子开发
+
+| 缩写/术语 | 英文全称或名称 | 含义与边界 |
+| --- | --- | --- |
+| Ascend | Ascend | 昇腾计算产品与软件生态，不泛指所有 NPU |
+| SoC | System on Chip | 芯片系统；ATC 目标 SoC 标识不能直接由板卡营销名称猜测 |
+| TOPS | Tera Operations Per Second | 每秒万亿次操作；必须注明数据类型、稀疏/稠密和运算计数口径，不直接代表应用吞吐 |
+| CANN | Compute Architecture for Neural Networks | 昇腾异构计算软件栈，包含模型、算子及运行支持 |
+| AscendCL / ACL | Ascend Computing Language | 昇腾设备、内存、stream、模型等运行时接口；此处 ACL 不指网络访问控制列表 |
+| ATC | Ascend Tensor Compiler | 将受支持的模型编译为目标设备离线模型的工具 |
+| ONNX | Open Neural Network Exchange | 模型交换格式，opset、算子语义与动态 shape 支持须核对 |
+| opset | Operator Set Version | ONNX 算子集合版本，影响导出和编译兼容性 |
+| OM | Offline Model | 昇腾离线模型产物，绑定相应编译目标与运行约束 |
+| torch_npu / TorchNPU | Ascend Extension for PyTorch | PyTorch 的昇腾设备适配；安装包版本与产品发布版本要分别记录 |
+| Ascend C | Ascend C | 昇腾自定义算子编程语言及配套开发接口，不是 CUDA C++ 的直接兼容实现 |
+| AI Core / AI CPU | Ascend AI Core / AI CPU | 昇腾计算资源类型；实际算子执行位置和能力以产品与采集证据为准 |
+| Cube / Vector | Matrix / Vector Compute Unit | 矩阵与向量计算路径，具体组织及数据类型依 SoC |
+| GM / UB | Global Memory / Unified Buffer | 设备全局存储与片上缓冲资源；大小及可访问方式依产品 |
+| tiling / tile | Tiling / Tile | 划分工作块及局部存储占用的方案，需同时处理尾块、对齐与并发 |
+| double buffering | Double Buffering | 用两个独立缓冲组织搬运与计算流水，重叠与正确性需要依赖同步保证 |
+| HCCL | Huawei Collective Communication Library | 昇腾集合通信库，不可直接套用 NCCL 环境变量或传输证据 |
+| msProf | MindStudio Profiler | 昇腾性能采集工具，入口和指标按所选发布版本核对 |
+| MLP | Multi-Layer Perceptron | 多层感知机，本实验采用小规模全连接模型作为部署和训练负载 |
+| ReLU | Rectified Linear Unit | 整流线性激活，常见定义为 `max(0, x)` |
+| dtype / shape / layout | Data Type / Tensor Shape / Memory Layout | 数据类型、张量维度和内存布局；逻辑形状正确不保证 buffer 编排正确 |
+| calibration | Quantization Calibration | 使用代表数据确定量化参数的过程，校准集与独立评测集应分离 |
+| INT8 | 8-bit Integer | 8 位整数计算类型；量化还包含缩放等数值映射，不是简单强制转型 |
+| Top-1 | Top-1 Accuracy | 最高预测类别与真实标签一致的比例，无标签负载不能报告该指标 |
+
+## 5. 单位与测量口径
 
 | 符号/术语 | 名称 | 含义与边界 |
 | --- | --- | --- |
@@ -157,8 +203,9 @@
 | offered load | Offered Load | 发送端提供的负载，不等于接收端有效吞吐 |
 | latency / throughput | Latency / Throughput | 延迟与吞吐；两者应分别测量，不能从流吞吐推算尾延迟 |
 
-## 5. 文档入口
+## 6. 文档入口
 
 - [实验目录](../README.md)
 - [DPU 阶段目录与公共环境](../DPU/README.md)
 - [GPU 阶段目录与公共环境](../GPU/README.md)
+- [NPU 阶段目录与公共环境](../NPU/README.md)
