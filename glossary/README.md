@@ -1,6 +1,6 @@
 # 名词与缩写
 
-本文件集中记录 DPU、GPU、NPU 各阶段使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
+本文件集中记录 DPU、GPU、NPU、Storage、GPUOperator 各阶段使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
 
 ## 1. 通用硬件、系统与虚拟化
 
@@ -163,7 +163,37 @@
 | rendezvous | Distributed Rendezvous | 分布式参与者建立作业成员与初始化连接的过程，不代表数据通信已成功 |
 | OOM | Out Of Memory | 内存资源不足，需记录失败规模和分配条件，不编造失败运行的耗时 |
 
-## 4. NPU、模型部署与算子开发
+## 4. GPU 算子开发与框架接口
+
+| 缩写/术语 | 英文全称或名称 | 含义与边界 |
+| --- | --- | --- |
+| operator / op | Operator | 算子的数学语义及框架契约；kernel 是其一种执行实现，二者不等同 |
+| schema / dispatcher | Operator Schema / Dispatcher | 接口类型及 mutation/alias 描述，以及按设备等 dispatch key 选择实现的框架机制 |
+| alias / mutation | Storage Aliasing / Mutation | 共享底层存储与修改已有数据；返回新 Tensor 对象不保证没有 alias |
+| stride / storage offset | Tensor Stride / Storage Offset | 各维步长与张量首元素相对存储起点的偏移；连续视图也可能有非零 offset |
+| grid-stride loop | Grid-Stride Loop | 线程以整个 grid 的跨度遍历数据的索引方式，仍需边界及整数溢出处理 |
+| reduction | Parallel Reduction | 将多元素归约为 max/sum 等结果，需正确单位元、同步及数值类型 |
+| softmax | Softmax | 指数归一化操作，常通过减去最大值提高稳定性；特殊值和空维需定义 |
+| epilogue | GEMM Epilogue | 矩阵乘累加后的 bias、激活或转换等步骤，融合可减少中间访存 |
+| kernel fusion | Kernel Fusion | 将多个操作合并执行以减少中间结果和 launch，不保证所有 shape 都更快 |
+| roofline / arithmetic intensity | Roofline Model / Arithmetic Intensity | 以带宽和计算上限约束性能的模型，以及每字节数据对应的运算数 |
+| register spill | Register Spilling | 寄存器压力导致部分值放入 local memory，可能增加实际访存 |
+| Triton | Triton | 面向并行计算 kernel 的语言和编译器，不是 NVIDIA Triton Inference Server |
+| program / autotune | Triton Program Instance / Automatic Tuning | Triton 程序实例及候选配置选择；首次编译与调优成本应单独计量 |
+| JIT / AOT | Just-In-Time / Ahead-Of-Time Compilation | 即时编译与提前编译；编译成功不保证运行时数值及设备兼容 |
+| ATen / LibTorch | A Tensor Library / LibTorch | PyTorch 张量与 C++ 接口体系，普通扩展受 ABI/版本组合约束 |
+| CUDAExtension | PyTorch CUDAExtension | PyTorch C++/CUDA 扩展的构建辅助，不是单独一个 CUDA kernel |
+| FakeTensor / fake kernel | Fake Tensor / Fake Implementation | 基于元数据推导张量行为的机制，不读取真实数据；不替代数值实现 |
+| autograd / VJP | Automatic Differentiation / Vector-Jacobian Product | 自动求导及反向模式中的向量-雅可比积 |
+| gradcheck / gradgradcheck | Gradient / Double Gradient Check | 对一阶/二阶梯度做数值检查；常规有限差分需要适当 FP64 路径和输入 |
+| opcheck | torch.library.opcheck | 检查自定义算子的注册、schema 等框架契约，不验证梯度公式数值正确性 |
+| torch.compile / graph break | PyTorch Compiler / Graph Break | 框架编译入口与无法继续捕获图的边界；图完整不等于算子全部融合 |
+| eager / steady state | Eager Execution / Steady State | 即时执行路径与排除首次加载/编译等成本后的稳态测量 |
+| NaN / Inf | Not a Number / Infinity | 浮点特殊值，比较时应单列其 mask 和传播行为，不能仅用普通相对误差 |
+| oracle | Test Oracle | 独立判定预期结果的参考实现或记录；不能仅复用待测算法作为唯一依据 |
+| wheel | Python Wheel | Python 二进制分发格式，平台/ABI/依赖兼容范围须按实际构建和测试声明 |
+
+## 5. NPU、模型部署与算子开发
 
 | 缩写/术语 | 英文全称或名称 | 含义与边界 |
 | --- | --- | --- |
@@ -192,7 +222,53 @@
 | INT8 | 8-bit Integer | 8 位整数计算类型；量化还包含缩放等数值映射，不是简单强制转型 |
 | Top-1 | Top-1 Accuracy | 最高预测类别与真实标签一致的比例，无标签负载不能报告该指标 |
 
-## 5. 单位与测量口径
+## 6. 存储开发、持久化与远程块设备
+
+| 缩写/术语 | 英文全称或名称 | 含义与边界 |
+| --- | --- | --- |
+| I/O | Input/Output | 输入输出；应用、文件系统、块层、控制器请求粒度可能不同 |
+| HDD / SSD | Hard Disk Drive / Solid-State Drive | 机械硬盘与固态盘；具体缓存、稳态和耐久性按设备核对 |
+| SATA | Serial ATA | 串行存储接口，不能与所有 SSD 或 NVMe 混称 |
+| NVMe | Non-Volatile Memory Express | 非易失性存储访问协议；NVMe 设备不保证所有写确认都具备掉电保护 |
+| NVMe-oF | NVMe over Fabrics | 经网络等 fabric 访问 NVMe namespace 的协议体系 |
+| NVMe/TCP / NVMe/RDMA | NVMe over TCP / NVMe over RDMA | 远程 NVMe 的不同传输，后端、网络、并发需对齐后比较 |
+| NQN / NSID | NVMe Qualified Name / Namespace Identifier | NVMe subsystem/host 命名及控制器视图中的 namespace ID；不等于 Linux 动态设备编号 |
+| namespace（存储） | NVMe Namespace | NVMe 可寻址逻辑块空间，不是 Linux 资源 namespace |
+| LBA | Logical Block Address | 逻辑块地址，乘以对应逻辑块大小才是字节偏移 |
+| SMART | Self-Monitoring, Analysis and Reporting Technology | 设备健康与统计信息；NVMe SMART/Health 日志不能当作性能或持久性证明 |
+| VFS / page cache | Virtual File System / Page Cache | Linux 文件接口抽象与文件数据缓存，buffered/direct 路径不同 |
+| bio / blk-mq | Block I/O / Multi-Queue Block I/O Queueing Mechanism | Linux 块 I/O 描述与多队列块层，存在拆分/合并和调度 |
+| LVM / RAID | Logical Volume Manager / Redundant Array of Independent Disks | 逻辑卷管理与磁盘阵列层，检查盘归属时不能忽略 |
+| holder / device-mapper | Block Device Holder / Device Mapper | 上层块设备依赖与 Linux 块设备映射框架；未挂载不等于无依赖 |
+| fio | Flexible I/O Tester | 可配置 I/O 负载与校验工具，须排除同名的其他软件 |
+| IOPS / QD | I/O Operations Per Second / Queue Depth | 每秒完成 I/O 数及队列深度；配置的 QD 不一定达到实际在途数 |
+| slat / clat / lat | Submission / Completion / Total Latency | fio 提交、完成及总延迟；与应用端 ack 延迟边界不同 |
+| buffered / direct | Buffered I/O / Direct I/O | 使用/尽量绕过 page cache 的文件数据路径；direct 不等于持久化或绕过设备缓存 |
+| pread / pwrite | Positioned Read / Write | 指定 offset 的同步文件读写，不依赖共享文件位置 |
+| fsync / fdatasync | File / File Data Synchronization | 同步文件数据与所需元数据的接口；新文件或 rename 的目录项通常还需目录 fsync |
+| Flush / FUA | Cache Flush / Force Unit Access | 存储命令的缓存提交/访问语义，需整个后端链路正确支持 |
+| PLP | Power Loss Protection | 设备的掉电保护能力，不由 O_DIRECT 或一次 fsync 成功自动证明 |
+| io_uring | io_uring | Linux 基于共享环的异步 I/O 接口，具体能力依内核和策略 |
+| SQE / CQE | Submission / Completion Queue Entry | io_uring 提交/完成队列项，CQE 负 res 表示负 errno |
+| SQPOLL / IOPOLL | Submission Queue Polling / I/O Polling | io_uring 提交轮询/完成轮询模式，支持条件和 CPU 代价需单列 |
+| AIO / liburing | Asynchronous I/O / liburing | 异步 I/O 概念或 Linux native AIO 路径，与 io_uring 用户态库；不可混报为同一引擎 |
+| SPDK | Storage Performance Development Kit | 用户态存储开发工具包；RAM/AIO 后端不等于 NVMe 控制器直驱 |
+| bdev / vbdev | Block Device / Virtual Block Device | SPDK 块设备抽象及在下层设备上转发/转换请求的虚拟模块 |
+| I/O channel / reactor | SPDK I/O Channel / Reactor | 线程相关 I/O 资源与执行轮询器，不能任意跨线程复用 channel |
+| RPC | Remote Procedure Call | 管理或服务调用机制，SPDK 常经本地 socket 使用 JSON-RPC 配置资源 |
+| Target / Host | NVMe-oF Target / Host | 远程块服务端与发起访问的主机，不能同时作为同一普通文件系统的无协调写者 |
+| NFS / S3 | Network File System / Amazon Simple Storage Service | 文件访问协议与对象存储服务/API 生态，不是本实验的 NVMe 块接口 |
+| digest | Protocol Digest | 传输协议的差错校验，不提供加密或身份认证 |
+| WAL / CRC | Write-Ahead Log / Cyclic Redundancy Check | 预写日志与循环冗余校验；CRC 检错不等于数据已经持久保存 |
+| durable ack | Durable Acknowledgment | 按已定义同步与故障边界返回的持久写确认，不是仅进入内核缓存 |
+| group commit | Group Commit | 多请求共用一次同步；等待凑批的时间也属于客户端延迟 |
+| tombstone | Tombstone Record | 用日志记录表示删除，恢复时参与 sequence 顺序判定 |
+| snapshot / manifest | Snapshot / Manifest | 某时刻状态与数据段组织/发布元信息，均需定义原子发布和同步顺序 |
+| at-least-once / dedup | At-Least-Once Delivery / Deduplication | 可能重试重复的交付语义与去重，未收到 ack 不表示数据一定未写入 |
+| EINTR / ENOSPC / EIO | Interrupted System Call / No Space Left / I/O Error | 中断、无空间及 I/O 错误；仅在规定条件重试，不能静默吞错 |
+| ASan / UBSan | AddressSanitizer / UndefinedBehaviorSanitizer | CPU 程序内存及未定义行为检查器，带工具运行不作性能基线 |
+
+## 7. 单位与测量口径
 
 | 符号/术语 | 名称 | 含义与边界 |
 | --- | --- | --- |
@@ -203,9 +279,11 @@
 | offered load | Offered Load | 发送端提供的负载，不等于接收端有效吞吐 |
 | latency / throughput | Latency / Throughput | 延迟与吞吐；两者应分别测量，不能从流吞吐推算尾延迟 |
 
-## 6. 文档入口
+## 8. 文档入口
 
 - [实验目录](../README.md)
 - [DPU 阶段目录与公共环境](../DPU/README.md)
 - [GPU 阶段目录与公共环境](../GPU/README.md)
 - [NPU 阶段目录与公共环境](../NPU/README.md)
+- [Storage 阶段目录与公共环境](../Storage/README.md)
+- [GPUOperator 阶段目录与公共环境](../GPUOperator/README.md)
