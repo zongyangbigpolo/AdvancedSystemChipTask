@@ -71,7 +71,7 @@ difftest 的判定对象是**提交轨迹**：每条退休指令记录 `PC` 与 
 | --- | --- | --- |
 | Verilog 仿真与 lint | 可行 | Homebrew 安装 Icarus Verilog 13.0 与 Verilator 5.054，体积小 |
 | 自写处理器 + difftest | 可行，已执行 | 本作业主体 |
-| 官方 NEMU / AM | 部分可行，未执行 | 依赖 Linux 风格构建环境与 RISC-V 交叉编译器；macOS 需额外移植或使用容器 |
+| 官方 NEMU / AM | 部分可行，未执行 | 依赖 Linux 风格构建环境与 RISC-V 交叉编译器；macOS 需额外移植或使用容器。标准流程见 [未执行项的过程说明](not-executed.md) |
 | RISC-V GCC 交叉工具链 | 可行但未安装 | 体积较大且当前磁盘余量有限；本作业以自写汇编器替代，仅支持上述指令子集 |
 | ysyxSoC（rocket-chip + mill + JVM） | 不建议 | 依赖重、构建时间长、磁盘占用大；适合在 Linux 服务器上进行 |
 | 运行 RT-Thread / Linux | 不可行 | 需要完整 SoC、外设与交叉编译工具链 |
@@ -145,3 +145,5 @@ Icarus 与 Verilator 对该语义的处理一致，因此只靠两个仿真器�
 - 未进行综合，不报告主频、面积与功耗。
 - 存储器为仿真模型，非 SRAM 宏单元；未实现字节/半字访存、CSR、异常与中断。
 - 后续计划：在 Linux 容器中安装 RISC-V GCC 运行官方 `riscv-tests`；扩展为五级流水线后沿用同一 difftest 框架；接入 NEMU 作为参考模型。
+
+本机未执行的 ysyxSoC 接入、RT-Thread、启动 Linux、逻辑综合与流片，其标准流程、所需环境、关键产物与判定标准见 [未执行项的过程说明](not-executed.md)。
