@@ -1,0 +1,2 @@
+ALU_RESULT total=101000 mismatch=0 PASS
+sim/alu_tb.v:33: $finish called at 101000000 (1ps)

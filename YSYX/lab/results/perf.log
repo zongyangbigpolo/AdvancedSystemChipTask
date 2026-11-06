@@ -1,0 +1,8 @@
+program         instret  cycles   CPI    alu-reg  alu-imm   branch     load    store     jump      lui    auipc  br_taken%
+sum                 306     307  1.00        101      104      100        0        0        0        1        0      99.0%
+fib               20714   20715  1.00        987     7891     1973     2958     2958     3946        1        0      50.0%
+sort               1208    1209  1.00        132      324      287      264       68      132        0        1      38.0%
+branch_edge          32      33  1.03          3       16        9        0        0        1        2        1       0.0%
+random_s1           459     460  1.00        188      180        0       42       42        0        7        0       0.0%
+random_s2           456     457  1.00        168      200        0       41       41        0        6        0       0.0%
+random_s3           456     457  1.00        181      188        0       40       40        0        7        0       0.0%
