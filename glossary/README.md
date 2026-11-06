@@ -1,6 +1,6 @@
 # 名词与缩写
 
-本文件集中记录 DPU、GPU、NPU、Storage、GPUOperator 各阶段使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
+本文件集中记录 DPU、GPU、NPU、Storage、GPUOperator 各阶段及一生一芯栏目使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
 
 ## 1. 通用硬件、系统与虚拟化
 
@@ -268,7 +268,31 @@
 | EINTR / ENOSPC / EIO | Interrupted System Call / No Space Left / I/O Error | 中断、无空间及 I/O 错误；仅在规定条件重试，不能静默吞错 |
 | ASan / UBSan | AddressSanitizer / UndefinedBehaviorSanitizer | CPU 程序内存及未定义行为检查器，带工具运行不作性能基线 |
 
-## 7. 单位与测量口径
+## 7. 一生一芯与处理器设计
+
+| 缩写/术语 | 英文全称或名称 | 含义与边界 |
+| --- | --- | --- |
+| YSYX | One Student One Chip（一生一芯） | 面向学生的开源 RISC-V 处理器芯片设计培养项目 |
+| RISC-V / ISA | RISC-V / Instruction Set Architecture | 开放指令集架构；RV32E/RV64、I/M/A/C 等扩展需逐项声明 |
+| RTL / HDL | Register Transfer Level / Hardware Description Language | 寄存器传输级设计及其描述语言，如 Verilog、SystemVerilog、Chisel |
+| NEMU | NJU Emulator | 一生一芯与南京大学 PA 实验使用的指令集模拟器，可作 difftest 参考模型 |
+| NPC | New Processor Core | 一生一芯中学员自行实现的 RTL 处理器 |
+| AM | Abstract Machine | 裸机运行时环境，向程序提供最小硬件抽象 |
+| PA | Programming Assignment | 南京大学计算机系统基础课程实验，一生一芯 NEMU 部分与其同源 |
+| sdb | Simple Debugger | NEMU 内置简易调试器 |
+| difftest | Differential Testing | 逐指令比较待测处理器与参考模型状态的验证方法；不等同于形式化验证 |
+| Verilator | Verilator | 将 Verilog/SystemVerilog 转换为 C++ 周期仿真模型的开源工具 |
+| ysyxSoC | ysyxSoC | 一生一芯提供的 SoC 集成环境，包含总线、外设与存储控制器 |
+| AXI4 / AXI4-Lite | Advanced eXtensible Interface 4 / Lite | AMBA 片上总线协议及其简化版本 |
+| IFU/IDU/EXU/LSU/WBU | Instruction Fetch/Decode/Execute/Load-Store/Write-Back Unit | 取指、译码、执行、访存、写回单元 |
+| CSR / CLINT | Control and Status Register / Core-Local Interruptor | 控制状态寄存器与核内本地中断控制器 |
+| hazard / bypass / stall | Pipeline Hazard / Bypass / Stall | 流水线冒险、旁路转发与停顿；旁路增加组合路径延迟 |
+| IPC / CPI（处理器性能） | Instructions Per Cycle / Cycles Per Instruction | 每周期指令数与每指令周期数，须注明测试程序与统计窗口；与第 3 节进程间通信 IPC 含义不同 |
+| Booth / Wallace | Booth Encoding / Wallace Tree | 乘法器的部分积编码与压缩结构 |
+| RT-Thread / xv6 | RT-Thread / xv6 | 一生一芯考核与进阶阶段使用的实时操作系统和教学操作系统 |
+| tape-out | Tape-out（流片） | 将版图交付制造；参与流片不等同于芯片已经回片验证 |
+
+## 8. 单位与测量口径
 
 | 符号/术语 | 名称 | 含义与边界 |
 | --- | --- | --- |
@@ -279,7 +303,7 @@
 | offered load | Offered Load | 发送端提供的负载，不等于接收端有效吞吐 |
 | latency / throughput | Latency / Throughput | 延迟与吞吐；两者应分别测量，不能从流吞吐推算尾延迟 |
 
-## 8. 文档入口
+## 9. 文档入口
 
 - [实验目录](../README.md)
 - [DPU 阶段目录与公共环境](../DPU/README.md)
@@ -287,3 +311,4 @@
 - [NPU 阶段目录与公共环境](../NPU/README.md)
 - [Storage 阶段目录与公共环境](../Storage/README.md)
 - [GPUOperator 阶段目录与公共环境](../GPUOperator/README.md)
+- [一生一芯栏目](../YSYX/README.md)

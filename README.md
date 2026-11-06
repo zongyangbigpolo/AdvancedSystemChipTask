@@ -7,10 +7,11 @@
 | NPU | [NPU/README.md](NPU/README.md) | Ascend 环境、模型转换与推理、精度与性能、Ascend C、HCCL 与训练 |
 | Storage | [Storage/README.md](Storage/README.md) | Linux 存储栈、同步/异步 I/O、SPDK bdev、NVMe-oF、WAL 与故障恢复 |
 | GPUOperator | [GPUOperator/README.md](GPUOperator/README.md) | CUDA/Triton 算子、归约与 GEMM、数值梯度、PyTorch 集成与交付 |
+| 一生一芯 | [YSYX/README.md](YSYX/README.md) | RISC-V 处理器芯片培养项目的课程结构、公开成果索引与检查记录（专题栏目，不按 phase 划分） |
 
 名词、缩写、英文全称及概念边界统一记录在 [名词与缩写](glossary/README.md)，各阶段文档不重复维护术语表。
 
-每个方向均包含五个独立阶段，分别使用 `phase1/README.md` 至 `phase5/README.md`，不按周或天重复命名。
+除一生一芯专题栏目外，每个方向均包含五个独立阶段，分别使用 `phase1/README.md` 至 `phase5/README.md`，不按周或天重复命名。
 
 | 阶段 | DPU | GPU | NPU | Storage | GPUOperator |
 | --- | --- | --- | --- | --- | --- |
