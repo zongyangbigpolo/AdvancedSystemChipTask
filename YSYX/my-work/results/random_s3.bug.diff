@@ -1,0 +1,6 @@
+DIFFTEST MISMATCH at commit #18
+   ok   0000003c x14=80000000
+   ok   00000040 x7=ffffffff
+   ok   00000044 x6=000001a2
+   REF  00000048 x9=ffffff80
+   DUT  00000048 x9=00000080

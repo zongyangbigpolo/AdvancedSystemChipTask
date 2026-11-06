@@ -1,6 +1,6 @@
 # 一生一芯（YSYX）：开源处理器芯片项目资料与公开成果
 
-[实验目录](../README.md) · [名词与缩写](../glossary/README.md) · [公开成果索引与检查记录](projects/README.md)
+[实验目录](../README.md) · [名词与缩写](../glossary/README.md) · [公开成果索引与检查记录](projects/README.md) · [个人作业：RV32E 处理器与 difftest 本机验证](my-work/README.md)
 
 “一生一芯”（One Student One Chip，YSYX）是面向学生的开源处理器芯片设计培养项目，以 RISC-V 处理器为主线，覆盖数字电路、C 语言系统软件、指令集模拟器、RTL 设计、仿真验证、SoC 集成、性能优化与流片准备。本栏目整理官方课程结构、公开学员成果的技术要点和复核方法，作为 DPU、GPU、NPU、存储方向之外的处理器设计参考栏目。
 
@@ -59,7 +59,7 @@ ysyx-workbench
 4. 核对性能数据口径：主频来源（综合报告或仿真假设）、IPC 统计窗口、缓存配置与测试程序。
 5. 区分作者自述、截图证据和可复现日志；无法复现的结论保留为“未复现”。
 
-具体条目与检查项见 [公开成果索引与检查记录](projects/README.md)。
+具体条目与检查项见 [公开成果索引与检查记录](projects/README.md)。在上述总结基础上独立完成的处理器设计、difftest 框架、本机可行性分析与运行截图见 [个人作业](my-work/README.md)。
 
 ## 6. 参考资料
 

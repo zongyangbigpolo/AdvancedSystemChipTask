@@ -1,0 +1,46 @@
+== tool versions
+Icarus Verilog version 13.0 (stable) (v13_0)
+Verilator 5.054 2026-11-01 rev vUNKNOWN-built20261101
+Python 3.14.2
+== verilator lint (-Wall)
+- V e r i l a t i o n   R e p o r t: Verilator 5.054 2026-11-01 rev vUNKNOWN-built20261101
+- Verilator: Built from 0.039 MB sources in 3 modules, into 0.093 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.041 s (elab=0.010, cvt=0.015, bld=0.000); cpu 0.025 s on 1 threads; allocated 11.984 MB
+LINT PASS
+== build simulators
+BUILD PASS (iverilog, iverilog+bug, verilator)
+
+PROGRAM          WORDS    ICARUS                               VERILATOR                            DIFFTEST
+sum              10       HIT_GOOD_TRAP a0=0 cycles=307        HIT_GOOD_TRAP a0=0 cycles=307        PASS (306 commits)
+fib              24       HIT_GOOD_TRAP a0=0 cycles=20715      HIT_GOOD_TRAP a0=0 cycles=20715      PASS (20714 commits)
+sort             42       HIT_GOOD_TRAP a0=0 cycles=1209       HIT_GOOD_TRAP a0=0 cycles=1209       PASS (1208 commits)
+branch_edge      33       HIT_GOOD_TRAP a0=0 cycles=33         HIT_GOOD_TRAP a0=0 cycles=33         PASS (32 commits)
+illegal_x16      3        ILLEGAL pc=00000004 cycles=1         ILLEGAL pc=00000004 cycles=1         PASS (1 commits)
+random_s1        460      HIT_GOOD_TRAP a0=0 cycles=460        HIT_GOOD_TRAP a0=0 cycles=460        PASS (459 commits)
+random_s2        457      HIT_GOOD_TRAP a0=0 cycles=457        HIT_GOOD_TRAP a0=0 cycles=457        PASS (456 commits)
+random_s3        457      HIT_GOOD_TRAP a0=0 cycles=457        HIT_GOOD_TRAP a0=0 cycles=457        PASS (456 commits)
+
+== fault injection: SRA implemented as SRL (-DINJECT_SRA_BUG)
+[random_s1]
+DIFFTEST MISMATCH at commit #21
+   ok   00000048 x12=00000001
+   ok   0000004c -
+   ok   00000050 x14=00000000
+   REF  00000054 x9=fe000000
+   DUT  00000054 x9=02000000
+[random_s2]
+DIFFTEST MISMATCH at commit #105
+   ok   00000198 x6=e0000000
+   ok   0000019c x14=fffffb94
+   ok   000001a0 x12=00000000
+   REF  000001a4 x13=ffffffff
+   DUT  000001a4 x13=00003fff
+[random_s3]
+DIFFTEST MISMATCH at commit #18
+   ok   0000003c x14=80000000
+   ok   00000040 x7=ffffffff
+   ok   00000044 x6=000001a2
+   REF  00000048 x9=ffffff80
+   DUT  00000048 x9=00000080
+injected bug detected in 3/3 random programs
+ALL DIFFTESTS PASS

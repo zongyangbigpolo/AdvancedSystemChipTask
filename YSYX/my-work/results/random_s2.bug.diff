@@ -1,0 +1,6 @@
+DIFFTEST MISMATCH at commit #105
+   ok   00000198 x6=e0000000
+   ok   0000019c x14=fffffb94
+   ok   000001a0 x12=00000000
+   REF  000001a4 x13=ffffffff
+   DUT  000001a4 x13=00003fff

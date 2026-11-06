@@ -1,0 +1,17 @@
+$ # 修复前 RTL: alu_out = alt ? ($signed(src1) >>> shamt) : (src1 >> shamt);
+$ vvp -n sim_before +HEX=branch_edge.hex
+RESULT  HIT_BAD_TRAP a0=5 cycles=17
+$ python3 tools/rvlab.py diff branch_edge.ref.trace branch_edge.before.trace
+DIFFTEST MISMATCH at commit #14
+   ok   0000002c -
+   ok   00000030 x10=00000005
+   ok   00000034 x7=80000000
+   REF  00000038 x12=ffffffff
+   DUT  00000038 x12=00000001
+$ python3 tools/rvlab.py diff random_s1.ref.trace random_s1.before.trace
+DIFFTEST MISMATCH at commit #21
+   ok   00000048 x12=00000001
+   ok   0000004c -
+   ok   00000050 x14=00000000
+   REF  00000054 x9=fe000000
+   DUT  00000054 x9=02000000
