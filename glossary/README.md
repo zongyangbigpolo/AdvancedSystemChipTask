@@ -1,6 +1,6 @@
 # 名词与缩写
 
-本文件集中记录 DPU、GPU、NPU、Storage、GPUOperator 各阶段及一生一芯栏目使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
+本文件集中记录 DPU、GPU、NPU、Storage、GPUOperator 各阶段及一生一芯、XenServer 栏目使用的名词与缩写。通用术语只保留一处定义，专用术语按方向分类；后续阶段新增术语时同步补充本表。产品名称、API 名称及普通技术术语不强行展开为缩写。
 
 ## 1. 通用硬件、系统与虚拟化
 
@@ -292,7 +292,38 @@
 | RT-Thread / xv6 | RT-Thread / xv6 | 一生一芯考核与进阶阶段使用的实时操作系统和教学操作系统 |
 | tape-out | Tape-out（流片） | 将版图交付制造；参与流片不等同于芯片已经回片验证 |
 
-## 8. 单位与测量口径
+## 8. 服务器虚拟化与 XenServer
+
+通用虚拟化术语（Hypervisor、VM/VMM、PV/HVM/PVHM、passthrough、virtio、VT-x/AMD-V 等）见第 1 节，此处只列 Xen/XenServer 专有项。
+
+| 缩写/术语 | 英文全称或名称 | 含义与边界 |
+| --- | --- | --- |
+| Xen | Xen Hypervisor | 开源 Type-1 hypervisor，XenServer 的内核；不等于 XenServer 产品本身 |
+| XenServer | Citrix XenServer | 基于 Xen 的服务器虚拟化产品，曾用名 Citrix Hypervisor；XCP-ng 为其开源分支 |
+| Type-1 / Type-2 | Bare-metal / Hosted Hypervisor | 裸机 hypervisor 与宿主 OS 上的 hypervisor；XenServer/ESXi 属 Type-1 |
+| dom0 / domU | Domain 0 / Guest Domain | Xen 的特权管理域（持有驱动）与普通客户域；dom0 不是普通 VM |
+| PVHVM | PV-on-HVM | HVM 客户机加装 PV 磁盘/网络驱动，兼顾兼容与性能，非纯 PV 或纯 HVM |
+| XAPI / xapi | XenAPI / XenServer management daemon | XenServer 管理 API 与其守护进程；对象化管理模型 |
+| xe | xe CLI | XenServer 命令行工具，按 `xe <class>-<action>` 操作对象 |
+| XenCenter / XenOrchestra | XenCenter / Xen Orchestra | 图形/Web 管理界面 |
+| SR / VDI | Storage Repository / Virtual Disk Image | 存储库与其上的虚拟磁盘；VDI 挂到 VM 的 VBD |
+| VBD | Virtual Block Device | VM 与 VDI 的连接对象 |
+| PIF / VIF | Physical / Virtual Interface | 主机物理网卡与 VM 虚拟网卡在 XAPI 中的对象 |
+| fast clone | Fast Clone | 基于写时复制的快速克隆，共享基镜像只记差异 |
+| coalesce | Snapshot Coalesce | 快照链合并以回收空间，由 GC 进程执行 |
+| thin provisioning | Thin Provisioning | 精简置备，按需分配实际空间，虚拟容量可大于已用 |
+| XenMotion | XenMotion | 运行态 VM 的实时迁移，迭代拷贝内存后短暂停、目标端恢复；需共享 SR |
+| Storage XenMotion | Storage XenMotion | 连同 VDI 一起迁移，可跨 SR 或无共享存储 |
+| pool | Resource Pool | 多台主机的统一管理域，XenMotion 与 HA 的前提 |
+| HA | High Availability | 池内主机故障时自动重启受保护 VM，需 heartbeat SR 与防脑裂 |
+| heartbeat SR | Heartbeat Storage Repository | HA 心跳所用的共享存储 |
+| fencing | Fencing | 隔离故障主机以防脑裂，不等于简单重启 |
+| xva | XVA archive | XenServer 的 VM 导出归档格式 |
+| OVS | Open vSwitch | XenServer 默认虚拟交换后端；详见 DPU 方向术语 |
+| HVF | Hypervisor.framework | macOS 的硬件虚拟化框架；本机实验用其加速原生架构客户机，非 XenServer 组件 |
+| libvirt / virsh | libvirt / virsh | 跨 hypervisor 的管理库与 CLI；本作业用其 test 驱动做纯内存模拟演示，非 XenServer |
+
+## 9. 单位与测量口径
 
 | 符号/术语 | 名称 | 含义与边界 |
 | --- | --- | --- |
@@ -303,7 +334,7 @@
 | offered load | Offered Load | 发送端提供的负载，不等于接收端有效吞吐 |
 | latency / throughput | Latency / Throughput | 延迟与吞吐；两者应分别测量，不能从流吞吐推算尾延迟 |
 
-## 9. 文档入口
+## 10. 文档入口
 
 - [实验目录](../README.md)
 - [DPU 阶段目录与公共环境](../DPU/README.md)
@@ -312,3 +343,4 @@
 - [Storage 阶段目录与公共环境](../Storage/README.md)
 - [GPUOperator 阶段目录与公共环境](../GPUOperator/README.md)
 - [一生一芯栏目](../YSYX/README.md)
+- [XenServer 服务器虚拟化栏目](../XenServer/README.md)

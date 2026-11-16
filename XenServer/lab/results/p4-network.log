@@ -1,0 +1,37 @@
+== [1] 受管虚拟网络（= XenServer network 对象） ==
+   Name      State    Autostart   Persistent
+  --------------------------------------------
+   default   active   no          yes
+  
+
+== [2] 网络定义：NAT 转发 + 网桥 + DHCP（= 内部网络 + 地址分配） ==
+  <network>
+    <name>default</name>
+    <uuid>dd8fe884-6c02-601e-7551-cca97df1c5df</uuid>
+    <forward mode='nat'/>
+    <bridge name='virbr0' stp='on' delay='0'/>
+    <ip address='192.168.122.1' netmask='255.255.255.0'>
+      <dhcp>
+        <range start='192.168.122.2' end='192.168.122.254'/>
+      </dhcp>
+    </ip>
+  </network>
+  
+
+== [3] QEMU 虚拟网卡后端类型（= VIF 的连接方式） ==
+  Available netdev backend types:
+  socket
+  stream
+  dgram
+  hubport
+  tap
+  user
+  vde
+  bridge
+  vhost-user
+  vmnet-host
+  vmnet-shared
+
+== [4] 虚拟网卡设备型号（virtio-net = XenServer PV 网卡；e1000 = 模拟网卡） ==
+  name "e1000", bus PCI, alias "e1000-82540em", desc "Intel Gigabit Ethernet"
+  name "rtl8139", bus PCI

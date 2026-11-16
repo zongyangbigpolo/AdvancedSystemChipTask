@@ -1,0 +1,44 @@
+
+
+$ define /tmp/xs-lab-vm.xml
+Domain 'xs-lab-vm' defined from /tmp/xs-lab-vm.xml
+
+$ start xs-lab-vm
+Domain 'xs-lab-vm' started
+
+$ dominfo xs-lab-vm
+Id:             2
+Name:           xs-lab-vm
+UUID:           37669ba1-ff2f-46f5-afdb-7f75ea51e26c
+State:          running
+CPU(s):         2
+CPU time:       1794800693.2s
+Max memory:     1048576 KiB
+Used memory:    1048576 KiB
+Persistent:     yes
+Autostart:      disable
+Managed save:   no
+Security model: testSecurity
+Security DOI:   
+Security label: libvirt-test (enforcing)
+
+$ suspend xs-lab-vm
+Domain 'xs-lab-vm' suspended
+
+$ domstate xs-lab-vm
+paused
+
+$ resume xs-lab-vm
+Domain 'xs-lab-vm' resumed
+
+$ domstate xs-lab-vm
+running
+
+$ setvcpus xs-lab-vm 1 --config --maximum
+
+$ list --all
+ Id   Name        State
+---------------------------
+ 1    test        running
+ 2    xs-lab-vm   running
+

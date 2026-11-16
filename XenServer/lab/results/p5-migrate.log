@@ -1,0 +1,45 @@
+=== A. 实时迁移核心机制：内存状态序列化与恢复（suspend -> save -> restore） ===
+
+
+$ define /tmp/xs-lab-vm.xml
+Domain 'xs-lab-vm' defined from /tmp/xs-lab-vm.xml
+
+$ start xs-lab-vm
+Domain 'xs-lab-vm' started
+
+$ domstate xs-lab-vm
+running
+
+$ save xs-lab-vm /tmp/xs-lab-vm.save
+
+Domain 'xs-lab-vm' saved to /tmp/xs-lab-vm.save
+
+$ list --all
+ Id   Name        State
+----------------------------
+ 1    test        running
+ -    xs-lab-vm   shut off
+
+$ restore /tmp/xs-lab-vm.save
+Domain restored from /tmp/xs-lab-vm.save
+
+$ domstate xs-lab-vm
+running
+
+$ list --all
+ Id   Name        State
+---------------------------
+ 1    test        running
+ 3    xs-lab-vm   running
+
+
+=== B. 基于快照的备份与导出（= 快照一致点 + 导出 xva） ===
+[1] 在 base.qcow2 建立一致性备份点 backup-point
+  Snapshot list:
+  ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
+  1       before-change         0 B 2026-11-16 11:44:53  0000:00:00.000          0
+  2       after-change          0 B 2026-11-16 11:44:53  0000:00:00.000          0
+  3       backup-point          0 B 2026-11-16 11:44:54  0000:00:00.000          0
+[2] 导出为独立离线备份 /tmp/xs-backup.qcow2
+  virtual size: 4 GiB (4294967296 bytes)
+  disk size: 196 KiB

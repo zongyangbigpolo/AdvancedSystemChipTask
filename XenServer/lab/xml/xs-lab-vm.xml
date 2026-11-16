@@ -1,0 +1,12 @@
+<!--
+  本机等价实验用的最小域定义，使用 libvirt test 驱动（纯内存模拟，不启动真实 VM）。
+  对应 XenServer 的 VM 对象：名称、内存、vCPU、OS 类型。
+-->
+<domain type='test'>
+  <name>xs-lab-vm</name>
+  <memory unit='MiB'>1024</memory>
+  <vcpu>2</vcpu>
+  <os>
+    <type arch='x86_64'>hvm</type>
+  </os>
+</domain>

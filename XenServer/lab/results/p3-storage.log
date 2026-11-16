@@ -1,0 +1,28 @@
+== [1] 创建精简置备 VDI（= SR 上的 thin VDI） ==
+Formatting 'base.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=4294967296 lazy_refcounts=off refcount_bits=16
+
+== [2] 精简置备：虚拟容量 vs 实际占用 ==
+  virtual size: 4 GiB (4294967296 bytes)
+  disk size: 196 KiB
+
+== [3] 快速克隆（qcow2 backing file = CoW，= XenServer fast clone / linked clone） ==
+Formatting 'clone-A.qcow2', fmt=qcow2 cluster_size=65536 extended_l2=off compression_type=zlib size=4294967296 backing_file=base.qcow2 backing_fmt=qcow2 lazy_refcounts=off refcount_bits=16
+  disk size: 196 KiB
+  backing file: base.qcow2
+  backing file format: qcow2
+  说明: clone-A 仅记录差异，写时复制；多台 VM 可共享同一 base，节省空间
+
+== [4] VDI 内部快照（= xe vdi-snapshot / vm-snapshot 的磁盘部分） ==
+  Snapshot list:
+  ID      TAG               VM_SIZE                DATE        VM_CLOCK     ICOUNT
+  1       before-change         0 B 2026-11-16 11:44:53  0000:00:00.000          0
+  2       after-change          0 B 2026-11-16 11:44:53  0000:00:00.000          0
+
+== [5] 一致性检查（= 快照链 coalesce 前的完整性校验） ==
+  No errors were found on the image.
+  Image end offset: 262144
+
+== [6] 导出为单文件（= xe vm-export / VDI 导出的离线镜像） ==
+  已将克隆链合并导出为 export.qcow2
+  virtual size: 4 GiB (4294967296 bytes)
+  (导出后无 backing file，成为独立整卷)
