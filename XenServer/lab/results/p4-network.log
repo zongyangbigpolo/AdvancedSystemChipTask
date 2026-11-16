@@ -35,3 +35,4 @@
 == [4] 虚拟网卡设备型号（virtio-net = XenServer PV 网卡；e1000 = 模拟网卡） ==
   name "e1000", bus PCI, alias "e1000-82540em", desc "Intel Gigabit Ethernet"
   name "rtl8139", bus PCI
+  name "virtio-net-pci", bus PCI, alias "virtio-net"

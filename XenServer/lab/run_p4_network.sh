@@ -14,5 +14,5 @@ echo "== [3] QEMU 虚拟网卡后端类型（= VIF 的连接方式） =="
 qemu-system-x86_64 -machine none -netdev help 2>&1 | sed -n '1,12p' | sed 's/^/  /'
 echo
 echo "== [4] 虚拟网卡设备型号（virtio-net = XenServer PV 网卡；e1000 = 模拟网卡） =="
-qemu-system-x86_64 -device help 2>&1 | grep -iE 'virtio-net-pci,|e1000",|rtl8139' | sed 's/^/  /'
+qemu-system-x86_64 -device help 2>&1 | grep -iE '"(virtio-net-pci|e1000|rtl8139)"' | sed 's/^/  /'
 } | tee results/p4-network.log
